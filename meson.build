@@ -10,6 +10,10 @@ add_project_arguments('-Wno-pedantic', language: 'cpp')
 add_project_arguments('-Wno-missing-field-initializers', language: 'cpp')
 
 
+libbe = compiler.find_library('be')
+libgame = compiler.find_library('game')
+libdrm0 = dependency('libdrm').partial_dependency(compile_args : true)
+
 SADomainsProj = subproject('SADomains')
 SADomains = SADomainsProj.get_variable('SADomains')
 
@@ -23,6 +27,8 @@ ThreadLink = ThreadLinkProj.get_variable('ThreadLink')
 #VideoStreams = VideoStreamsProj.get_variable('VideoStreams')
 VideoStreams = dependency('libvideostreams')
 
+
+subdir('firmware')
 
 executable('RadeonGfx',
 	[
@@ -70,11 +76,11 @@ executable('RadeonGfx',
 		'/boot/system/develop/headers/private/graphics/common',
 		'/boot/system/develop/headers/private/system',
 		'/boot/system/develop/headers/private/system/arch/x86_64',
-		'/boot/system/develop/headers/libdrm',
 	],
 	dependencies: [
-		compiler.find_library('be'),
-		compiler.find_library('game'),
+		libbe,
+		libgame,
+		libdrm0,
 		Locks,
 		SADomains,
 		ThreadLink,
