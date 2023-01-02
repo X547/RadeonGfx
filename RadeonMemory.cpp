@@ -137,7 +137,7 @@ void AddressSpace::DumpPageTable()
 		if (pdeVal.flags & R600_PTE_VALID) {
 			printf("  %#" B_PRIx64 ": %#" B_PRIx64 ", %#" B_PRIx64 ", ", pdeIdx * pageTableLen * B_PAGE_SIZE, pdeVal.ppn * B_PAGE_SIZE, fPageTableBufs[pdeIdx].buf->gpuPhysAdr);
 			WritePteFlags(pdeVal.flags); printf("\n");
-			
+
 			for (uint64 pteIdx = 0; pteIdx < pageTableLen; pteIdx ++) {
 				Pte *pte = (Pte*)fPageTableBufs[pdeIdx].adr + pteIdx;
 				Pte pteVal = *pte;
@@ -407,7 +407,7 @@ status_t MemoryManager::GetUsage(uint64 &total, uint64 &alloc, MemoryDomain doma
 status_t MemoryManager::InitGart()
 {
 	if (fGartEnabled) return B_OK;
-	
+
 	uint32 radeon_vm_block_size = 9;
 
 	fGartPageTable.SetTo(Alloc(boDomainVramMappable, fGttRange.size / B_PAGE_SIZE * sizeof(uint64)));
@@ -422,15 +422,6 @@ status_t MemoryManager::InitGart()
 			.enableAdvancedDriverModel = true,
 			.ecoBits = 0xA
 	}.val);
-#if 0
-	WriteReg4AmdGpu(mmMC_VM_MX_L1_TLB_CNTL,
-	       (0xA << 7) |
-	       ENABLE_L1_TLB |
-	       ENABLE_L1_FRAGMENT_PROCESSING |
-	       SYSTEM_ACCESS_MODE_NOT_IN_SYS |
-	       ENABLE_ADVANCED_DRIVER_MODEL |
-	       SYSTEM_APERTURE_UNMAPPED_ACCESS_PASS_THRU);
-#endif
 	/* Setup L2 cache */
 	WriteReg4AmdGpu(mmVM_L2_CNTL, VmL2Cntl {
 			.enableL2Cache = true,
@@ -440,38 +431,22 @@ status_t MemoryManager::InitGart()
 			.effectiveL2QueueSize = 7,
 			.context1IdentityAccessMode = 1
 	}.val);
-#if 0
-	WriteReg4AmdGpu(mmVM_L2_CNTL, ENABLE_L2_CACHE |
-	       ENABLE_L2_FRAGMENT_PROCESSING |
-	       ENABLE_L2_PTE_CACHE_LRU_UPDATE_BY_WRITE |
-	       ENABLE_L2_PDE0_CACHE_LRU_UPDATE_BY_WRITE |
-	       EFFECTIVE_L2_QUEUE_SIZE(7) |
-	       CONTEXT1_IDENTITY_ACCESS_MODE(1));
-#endif
 	WriteReg4AmdGpu(mmVM_L2_CNTL2, VmL2Cntl2 {
 			.invalidateAllL1Tlbs = true,
 			.invalidateL2Cache = true,
 	}.val);
-#if 0
-	WriteReg4AmdGpu(mmVM_L2_CNTL2, INVALIDATE_ALL_L1_TLBS | INVALIDATE_L2_CACHE);
-#endif
 	WriteReg4AmdGpu(mmVM_L2_CNTL3, VmL2Cntl3 {
 			.bankSelect = 4,
 			.l2CacheBigkFragmentSize = 4,
 			.l2CacheBigkAssociativity = true,
 	}.val);
-#if 0
-	WriteReg4AmdGpu(mmVM_L2_CNTL3, L2_CACHE_BIGK_ASSOCIATIVITY |
-	       BANK_SELECT(4) |
-	       L2_CACHE_BIGK_FRAGMENT_SIZE(4));
-#endif
 	/* setup context0 */
 	WriteReg4AmdGpu(mmVM_CONTEXT0_PAGE_TABLE_START_ADDR, fGttRange.beg / B_PAGE_SIZE);
 	WriteReg4AmdGpu(mmVM_CONTEXT0_PAGE_TABLE_END_ADDR, (fGttRange.beg + fGttRange.size) / B_PAGE_SIZE - 1);
-	
+
 	printf("VM_CONTEXT0_PAGE_TABLE_START_ADDR: %#" B_PRIx32 "\n", ReadReg4AmdGpu(mmVM_CONTEXT0_PAGE_TABLE_START_ADDR));
 	printf("VM_CONTEXT0_PAGE_TABLE_END_ADDR: %#" B_PRIx32 "\n", ReadReg4AmdGpu(mmVM_CONTEXT0_PAGE_TABLE_END_ADDR));
-	
+
 	WriteReg4AmdGpu(mmVM_CONTEXT0_PAGE_TABLE_BASE_ADDR, fGartPageTable.buf->gpuPhysAdr >> 12);
 	WriteReg4AmdGpu(mmVM_CONTEXT0_PROTECTION_FAULT_DEFAULT_ADDR,
 			(uint32)(fDummyPage->gpuPhysAdr >> 12));
@@ -481,10 +456,6 @@ status_t MemoryManager::InitGart()
 			.pageTableDepth = 0,
 			.rangeProtectionFaultEnableDefault = true,
 	}.val);
-#if 0
-	WriteReg4AmdGpu(mmVM_CONTEXT0_CNTL, (ENABLE_CONTEXT | PAGE_TABLE_DEPTH(0) |
-				  RANGE_PROTECTION_FAULT_ENABLE_DEFAULT));
-#endif
 
 	WriteReg4AmdGpu(mmVM_L2_CONTEXT1_IDENTITY_APERTURE_LOW_ADDR, 0);
 	WriteReg4AmdGpu(mmVM_L2_CONTEXT1_IDENTITY_APERTURE_HIGH_ADDR, 0);
@@ -532,22 +503,6 @@ status_t MemoryManager::InitGart()
 			.writeProtectionFaultEnableDefault = true,
 			.pageTableBlockSize = radeon_vm_block_size - 9
 	}.val);
-#if 0
-	WriteReg4AmdGpu(mmVM_CONTEXT1_CNTL, ENABLE_CONTEXT | PAGE_TABLE_DEPTH(1) |
-				PAGE_TABLE_BLOCK_SIZE(radeon_vm_block_size - 9) |
-				RANGE_PROTECTION_FAULT_ENABLE_INTERRUPT |
-				RANGE_PROTECTION_FAULT_ENABLE_DEFAULT |
-				DUMMY_PAGE_PROTECTION_FAULT_ENABLE_INTERRUPT |
-				DUMMY_PAGE_PROTECTION_FAULT_ENABLE_DEFAULT |
-				PDE0_PROTECTION_FAULT_ENABLE_INTERRUPT |
-				PDE0_PROTECTION_FAULT_ENABLE_DEFAULT |
-				VALID_PROTECTION_FAULT_ENABLE_INTERRUPT |
-				VALID_PROTECTION_FAULT_ENABLE_DEFAULT |
-				READ_PROTECTION_FAULT_ENABLE_INTERRUPT |
-				READ_PROTECTION_FAULT_ENABLE_DEFAULT |
-				WRITE_PROTECTION_FAULT_ENABLE_INTERRUPT |
-				WRITE_PROTECTION_FAULT_ENABLE_DEFAULT);
-#endif
 #endif
 
 	fGartEnabled = true;
