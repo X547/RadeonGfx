@@ -55,13 +55,6 @@ static status_t gmc_v6_0_wait_for_idle()
 	return B_ERROR;
 }
 
-#define	VGA_RENDER_CONTROL 0x0300
-#define BLACKOUT_MODE_MASK 0x00000007
-#define R_000300_VGA_RENDER_CONTROL 0x000300
-#define C_000300_VGA_VSTATUS_CNTL 0xFFFCFFFF
-
-#define RADEON_MAX_CRTCS 6
-
 
 static uint32 gfx_v6_0_get_csb_size()
 {
@@ -142,7 +135,7 @@ static void WriteRegisterList(const uint32 *registers, const uint32 array_size)
 		return;
 
 	for (uint32 i = 0; i < array_size; i += 3) {
-		reg = registers[i + 0] / 4; // convert to AMDGPU headers register format
+		reg = registers[i + 0];
 		and_mask = registers[i + 1];
 		or_mask = registers[i + 2];
 
@@ -159,10 +152,37 @@ static void WriteRegisterList(const uint32 *registers, const uint32 array_size)
 
 void InitGoldenRegisters()
 {
-	WriteRegisterList(verde_golden_registers, B_COUNT_OF(verde_golden_registers));
-	WriteRegisterList(verde_golden_rlc_registers, B_COUNT_OF(verde_golden_rlc_registers));
-	WriteRegisterList(verde_mgcg_cgcg_init, B_COUNT_OF(verde_mgcg_cgcg_init));
-	WriteRegisterList(verde_pg_init, B_COUNT_OF(verde_pg_init));
+	switch (gDevice.SharedInfo()->chipsetID) {
+		case RADEON_TAHITI:
+			WriteRegisterList(tahiti_golden_registers, B_COUNT_OF(tahiti_golden_registers));
+			WriteRegisterList(tahiti_golden_rlc_registers, B_COUNT_OF(tahiti_golden_rlc_registers));
+			WriteRegisterList(tahiti_mgcg_cgcg_init, B_COUNT_OF(tahiti_mgcg_cgcg_init));
+			WriteRegisterList(tahiti_golden_registers2, B_COUNT_OF(tahiti_golden_registers2));
+			break;
+		case RADEON_PITCAIRN:
+			WriteRegisterList(pitcairn_golden_registers, B_COUNT_OF(pitcairn_golden_registers));
+			WriteRegisterList(pitcairn_golden_rlc_registers, B_COUNT_OF(pitcairn_golden_rlc_registers));
+			WriteRegisterList(pitcairn_mgcg_cgcg_init, B_COUNT_OF(pitcairn_mgcg_cgcg_init));
+			break;
+		case RADEON_CAPEVERDE:
+			WriteRegisterList(verde_golden_registers, B_COUNT_OF(verde_golden_registers));
+			WriteRegisterList(verde_golden_rlc_registers, B_COUNT_OF(verde_golden_rlc_registers));
+			WriteRegisterList(verde_mgcg_cgcg_init, B_COUNT_OF(verde_mgcg_cgcg_init));
+			WriteRegisterList(verde_pg_init, B_COUNT_OF(verde_pg_init));
+			break;
+		case RADEON_OLAND:
+			WriteRegisterList(oland_golden_registers, B_COUNT_OF(oland_golden_registers));
+			WriteRegisterList(oland_golden_rlc_registers, B_COUNT_OF(oland_golden_rlc_registers));
+			WriteRegisterList(oland_mgcg_cgcg_init, B_COUNT_OF(oland_mgcg_cgcg_init));
+			break;
+		case RADEON_HAINAN:
+			WriteRegisterList(hainan_golden_registers, B_COUNT_OF(hainan_golden_registers));
+			WriteRegisterList(hainan_golden_registers2, B_COUNT_OF(hainan_golden_registers2));
+			WriteRegisterList(hainan_mgcg_cgcg_init, B_COUNT_OF(hainan_mgcg_cgcg_init));
+			break;
+		default:
+			abort();
+	}
 }
 
 
@@ -203,7 +223,7 @@ status_t InitCP()
 		ring->Write(PACKET3_ME_INITIALIZE_DEVICE_ID(1));
 		ring->Write(0);
 		ring->Write(0);
-	
+
 		/* init the CE partitions */
 		ring->Write(PACKET3(PACKET3_SET_BASE, 2));
 		ring->Write(PACKET3_BASE_INDEX(CE_PARTITION_BASE));
@@ -225,7 +245,7 @@ status_t InitCP()
 		/* setup clear context state */
 		ring->Write(PACKET3(PACKET3_PREAMBLE_CNTL, 0));
 		ring->Write(PACKET3_PREAMBLE_BEGIN_CLEAR_STATE);
-	
+
 		for (const struct cs_section_def *sect = gDevice.fRlc.csData; sect->section != NULL; ++sect) {
 			for (const struct cs_extent_def *ext = sect->section; ext->extent != NULL; ++ext) {
 				if (sect->id == SECT_CONTEXT) {
@@ -239,11 +259,11 @@ status_t InitCP()
 
 		ring->Write(PACKET3(PACKET3_PREAMBLE_CNTL, 0));
 		ring->Write(PACKET3_PREAMBLE_END_CLEAR_STATE);
-	
+
 		/* set clear context state */
 		ring->Write(PACKET3(PACKET3_CLEAR_STATE, 0));
 		ring->Write(0);
-	
+
 		ring->Write(PACKET3(PACKET3_SET_CONTEXT_REG, 2));
 		ring->Write(0x00000316);
 		ring->Write(0x0000000e); /* VGT_VERTEX_REUSE_BLOCK_CNTL */
@@ -264,11 +284,11 @@ status_t InitCP()
 		}
 		if (auto ring = rings[i].Lock()) {
 			CheckRet(ring->Begin(2));
-	
+
 			/* clear the compute context state */
 			ring->Write(PACKET3_COMPUTE(PACKET3_CLEAR_STATE, 0));
 			ring->Write(0);
-	
+
 			ring->End();
 			// CheckRet(ring->WaitEmpty());
 		}
@@ -331,19 +351,19 @@ status_t ResetMC()
 		tmp |= softReset.val;
 		printf("SRBM_SOFT_RESET = %#" B_PRIx32 "\n", tmp);
 		WriteReg4AmdGpu(mmSRBM_SOFT_RESET, tmp);
-		
+
 		snooze(50);
-		
+
 		tmp &= ~softReset.val;
 		WriteReg4AmdGpu(mmSRBM_SOFT_RESET, tmp);
 		tmp = ReadReg4AmdGpu(mmSRBM_SOFT_RESET);
-		
+
 		snooze(50);
-		
+
 		ResumeMC();
 		snooze(50);
 	}
-	
+
 	return B_OK;
 }
 
@@ -366,10 +386,10 @@ status_t ResetMC()
 		tmp &= ~softReset.val;
 		WriteReg4AmdGpu(mmSRBM_SOFT_RESET, tmp);
 		tmp = ReadReg4AmdGpu(mmSRBM_SOFT_RESET);
-		
+
 		snooze(50);
 	}
-	
+
 	return B_OK;
 }
 #endif
@@ -377,7 +397,7 @@ status_t ResetMC()
 status_t InitMC()
 {
 	printf("SRBM_STATUS: "); WriteSet(ReadReg4AmdGpu(mmSRBM_STATUS)); printf("\n");
-	
+
 	/* Initialize HDP */
 	for (int i = 0, j = 0; i < 32; i++, j += 0x6) {
 		WriteReg4AmdGpu(0xb05 + j, 0x00000000);
@@ -416,7 +436,7 @@ status_t InitMC()
 	if (gmc_v6_0_wait_for_idle() < B_OK) {
 		printf("[!] Wait for MC idle timedout !\n");
 	}
-	
+
 	return B_OK;
 }
 
@@ -454,7 +474,7 @@ static void gfx_v6_0_get_csb_buffer(vuint32 *buffer)
 
 	buffer[count++] = B_HOST_TO_LENDIAN_INT32(PACKET3(PACKET3_SET_CONTEXT_REG, 1));
 	buffer[count++] = B_HOST_TO_LENDIAN_INT32(PA_SC_RASTER_CONFIG - PACKET3_SET_CONTEXT_REG_START);
-	buffer[count++] = B_HOST_TO_LENDIAN_INT32(0x0000124a /* for CHIP_VERDE */);
+	buffer[count++] = B_HOST_TO_LENDIAN_INT32(gDevice.fInfo.gfx.config.rb_config[0][0].raster_config);
 
 	buffer[count++] = B_HOST_TO_LENDIAN_INT32(PACKET3(PACKET3_PREAMBLE_CNTL, 0));
 	buffer[count++] = B_HOST_TO_LENDIAN_INT32(PACKET3_PREAMBLE_END_CLEAR_STATE);

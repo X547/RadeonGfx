@@ -1456,7 +1456,25 @@ static void gfx_v6_0_constants_init(struct amdgpu_device *adev)
 
 status_t InitGpu(amdgpu_device *dev)
 {
-	dev->asic_type = CHIP_VERDE;
+	switch (gDevice.SharedInfo()->chipsetID) {
+		case RADEON_CAPEVERDE:
+			dev->asic_type = CHIP_VERDE;
+			break;
+		case RADEON_PITCAIRN:
+			dev->asic_type = CHIP_PITCAIRN;
+			break;
+		case RADEON_TAHITI:
+			dev->asic_type = CHIP_TAHITI;
+			break;
+		case RADEON_OLAND:
+			dev->asic_type = CHIP_OLAND;
+			break;
+		case RADEON_HAINAN:
+			dev->asic_type = CHIP_HAINAN;
+			break;
+		default:
+			return B_NOT_SUPPORTED;
+	}
 	gfx_v6_0_constants_init(dev);
 	return B_OK;
 }
