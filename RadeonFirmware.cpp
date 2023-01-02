@@ -15,6 +15,12 @@
 #define CheckRet(err) {status_t _err = (err); if (_err < B_OK) return _err;}
 
 
+struct FirmwareLoadInfo {
+		RadeonDevice::Firmware *firmware;
+		const char *name;
+};
+
+
 static void radeon_ucode_print_common_hdr(const common_firmware_header *hdr)
 {
 	printf("  size_bytes: %u\n", B_LENDIAN_TO_HOST_INT32(hdr->size_bytes));
@@ -51,30 +57,54 @@ static void radeon_ucode_print_gfx_hdr(const radeon_firmware_header *hdr)
 }
 
 
+static FirmwareLoadInfo const *GetFirmwareLoadInfo()
+{
+	switch (gDevice.SharedInfo()->chipsetID) {
+		case RADEON_CAPEVERDE: {
+			static const FirmwareLoadInfo fw[] = {
+				{&gDevice.fFirmwares.pfp, "verde_pfp.bin"},
+				{&gDevice.fFirmwares.ce, "verde_ce.bin"},
+				{&gDevice.fFirmwares.me, "verde_me.bin"},
+				{&gDevice.fFirmwares.mc, "verde_mc.bin"},
+				{&gDevice.fFirmwares.rlc, "verde_rlc.bin"},
+				{}
+			};
+			return fw;
+		}
+		case RADEON_TAHITI: {
+			static const FirmwareLoadInfo fw[] = {
+				{&gDevice.fFirmwares.pfp, "tahiti_pfp.bin"},
+				{&gDevice.fFirmwares.ce, "tahiti_ce.bin"},
+				{&gDevice.fFirmwares.me, "tahiti_me.bin"},
+				{&gDevice.fFirmwares.mc, "tahiti_mc.bin"},
+				{&gDevice.fFirmwares.rlc, "tahiti_rlc.bin"},
+				{}
+			};
+			return fw;
+		}
+		default:
+			return NULL;
+	}
+}
+
+
 status_t LoadFirmware()
 {
-	struct {
-		RadeonDevice::Firmware &firmware;
-		const char *name;
-	} firmwares[] = {
-		{gDevice.fFirmwares.pfp, "verde_pfp.bin"},
-		{gDevice.fFirmwares.ce, "verde_ce.bin"},
-		{gDevice.fFirmwares.me, "verde_me.bin"},
-		{gDevice.fFirmwares.mc, "verde_mc.bin"},
-		{gDevice.fFirmwares.rlc, "verde_rlc.bin"},
-	};
-	
-	for (size_t i = 0; i < B_COUNT_OF(firmwares); i++) {
+	FirmwareLoadInfo const *firmwares = GetFirmwareLoadInfo();
+	if (firmwares == NULL)
+		return B_NOT_SUPPORTED;
+
+	for (size_t i = 0; firmwares[i].firmware != NULL; i++) {
 		printf("loading firmware \"%s\"\n", firmwares[i].name);
 		BString path;
 		path.SetToFormat("../firmware/%s", firmwares[i].name);
 		BFile file(path.String(), B_READ_ONLY);
 		CheckRet(file.InitCheck());
-		CheckRet(file.GetSize(&firmwares[i].firmware.size));
-		firmwares[i].firmware.data.SetTo(new uint8[firmwares[i].firmware.size]);
-		CheckRet(file.Read(firmwares[i].firmware.data.Get(), firmwares[i].firmware.size));
-		
-		radeon_ucode_print_gfx_hdr((radeon_firmware_header*)firmwares[i].firmware.data.Get());
+		CheckRet(file.GetSize(&firmwares[i].firmware->size));
+		firmwares[i].firmware->data.SetTo(new uint8[firmwares[i].firmware->size]);
+		CheckRet(file.Read(firmwares[i].firmware->data.Get(), firmwares[i].firmware->size));
+
+		radeon_ucode_print_gfx_hdr((radeon_firmware_header*)firmwares[i].firmware->data.Get());
 	}
 
 	return B_OK;
@@ -115,7 +145,7 @@ status_t LoadCpMicrocode()
 	for (uint32 i = 0; i < fw_size; i++)
 		WriteReg4AmdGpu(mmCP_ME_RAM_DATA, B_LENDIAN_TO_HOST_INT32(fw_data[i]));
 	WriteReg4AmdGpu(mmCP_ME_RAM_WADDR, 0);
-	
+
 	WriteReg4AmdGpu(mmCP_PFP_UCODE_ADDR, 0);
 	WriteReg4AmdGpu(mmCP_CE_UCODE_ADDR, 0);
 	WriteReg4AmdGpu(mmCP_ME_RAM_WADDR, 0);

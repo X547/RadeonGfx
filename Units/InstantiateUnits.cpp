@@ -8,6 +8,7 @@ status_t InstantiateUnits(RadeonDevice *dev)
 {
 	switch (dev->SharedInfo()->chipsetID) {
 		case RADEON_CAPEVERDE:
+		case RADEON_TAHITI:
 			//dev->InstallUnit(Gmc6UnitNew(dev));
 			//dev->InstallUnit(Ih1UnitNew(dev));
 			dev->InstallUnit(DmaV1UnitNew(dev));
