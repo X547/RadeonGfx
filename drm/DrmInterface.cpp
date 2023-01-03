@@ -4,6 +4,8 @@
 #include "RadeonMemory.h"
 #include "gfx_6_0_d.h"
 #include "gmc_6_0_d.h"
+#include "oss_1_0_d.h"
+#include "sid_amdgpu.h"
 #define _DEFAULT_SOURCE
 extern "C" {
 #include <xf86drm.h>
@@ -20,50 +22,39 @@ ExternalPtr<TeamState> gTeamState;
 status_t InitDevice();
 
 
-static int drmAmdgpuReadMmrReg(uint32_t offset, uint32_t *value)
+static int drmAmdgpuReadMmrReg(uint32_t offset, uint32_t seNum, uint32_t shNum, uint32_t *value)
 {
+	uint32_t seIdx = (seNum == 0xffffffff) ? 0 : seNum;
+	uint32_t shIdx = (shNum == 0xffffffff) ? 0 : shNum;
 	switch (offset) {
-		case mmCC_RB_BACKEND_DISABLE: *value = 0x1; return 0;
-		case mmPA_SC_RASTER_CONFIG: *value = 0x1240; return 0;
-		case mmGB_ADDR_CONFIG: *value = 0x12010002; return 0;
-
-		case mmGB_TILE_MODE0 + 0x0: *value = 0x3a0112; return 0;
-		case mmGB_TILE_MODE0 + 0x1: *value = 0x3a0912; return 0;
-		case mmGB_TILE_MODE0 + 0x2: *value = 0x3a1112; return 0;
-		case mmGB_TILE_MODE0 + 0x3: *value = 0x212912; return 0;
-		case mmGB_TILE_MODE0 + 0x4: *value = 0x10a; return 0;
-		case mmGB_TILE_MODE0 + 0x5: *value = 0x111912; return 0;
-		case mmGB_TILE_MODE0 + 0x6: *value = 0x121112; return 0;
-		case mmGB_TILE_MODE0 + 0x7: *value = 0x22112; return 0;
-		case mmGB_TILE_MODE0 + 0x8: *value = 0x4; return 0;
-		case mmGB_TILE_MODE0 + 0x9: *value = 0x108; return 0;
-		case mmGB_TILE_MODE0 + 0xa: *value = 0x3a1110; return 0;
-		case mmGB_TILE_MODE0 + 0xb: *value = 0x351110; return 0;
-		case mmGB_TILE_MODE0 + 0xc: *value = 0x341910; return 0;
-		case mmGB_TILE_MODE0 + 0xd: *value = 0x109; return 0;
-		case mmGB_TILE_MODE0 + 0xe: *value = 0x361111; return 0;
-		case mmGB_TILE_MODE0 + 0xf: *value = 0x351111; return 0;
-		case mmGB_TILE_MODE0 + 0x10: *value = 0x341911; return 0;
-		case mmGB_TILE_MODE0 + 0x11: *value = 0x342911; return 0;
-		case mmGB_TILE_MODE0 + 0x12: *value = 0x10d; return 0;
-		case mmGB_TILE_MODE0 + 0x13: *value = 0x342921; return 0;
-		case mmGB_TILE_MODE0 + 0x14: *value = 0x34291d; return 0;
-		case mmGB_TILE_MODE0 + 0x15: *value = 0x221111; return 0;
-		case mmGB_TILE_MODE0 + 0x16: *value = 0x211111; return 0;
-		case mmGB_TILE_MODE0 + 0x17: *value = 0x121111; return 0;
-		case mmGB_TILE_MODE0 + 0x18: *value = 0x111911; return 0;
-		case mmGB_TILE_MODE0 + 0x19: *value = 0x22111; return 0;
-		case mmGB_TILE_MODE0 + 0x1a: *value = 0x22111; return 0;
-		case mmGB_TILE_MODE0 + 0x1b: *value = 0x22111; return 0;
-		case mmGB_TILE_MODE0 + 0x1c: *value = 0x22111; return 0;
-		case mmGB_TILE_MODE0 + 0x1d: *value = 0x22111; return 0;
-		case mmGB_TILE_MODE0 + 0x1e: *value = 0x12911; return 0;
-		case mmGB_TILE_MODE0 + 0x1f: *value = 0; return 0;
-
-		case mmMC_ARB_RAMCFG: *value = 0x262; return 0;
-	}
-	switch (offset) {
-		case mmGRBM_STATUS: *value = ReadReg4AmdGpu(mmGRBM_STATUS); return 0;
+		case mmCC_RB_BACKEND_DISABLE:
+			*value = gDevice.fInfo.gfx.config.rb_config[seIdx][shIdx].rb_backend_disable; return 0;
+		case mmGC_USER_RB_BACKEND_DISABLE:
+			*value = gDevice.fInfo.gfx.config.rb_config[seIdx][shIdx].user_rb_backend_disable; return 0;
+		case mmPA_SC_RASTER_CONFIG:
+			*value = gDevice.fInfo.gfx.config.rb_config[seIdx][shIdx].raster_config; return 0;
+		case mmGB_ADDR_CONFIG:
+			*value = gDevice.fInfo.gfx.config.gb_addr_config; return 0;
+		case mmMC_ARB_RAMCFG:
+			*value = gDevice.fInfo.gfx.config.mc_arb_ramcfg; return 0;
+		case mmGRBM_STATUS:
+		case mmGRBM_STATUS2:
+		case mmGRBM_STATUS_SE0:
+		case mmGRBM_STATUS_SE1:
+		case mmSRBM_STATUS:
+		case mmSRBM_STATUS2:
+		case DMA_STATUS_REG + DMA0_REGISTER_OFFSET:
+		case DMA_STATUS_REG + DMA1_REGISTER_OFFSET:
+		case mmCP_STAT:
+		case mmCP_STALLED_STAT1:
+		case mmCP_STALLED_STAT2:
+		case mmCP_STALLED_STAT3:
+			*value = ReadReg4AmdGpu(offset); return 0;
+		default:
+			if (offset >= mmGB_TILE_MODE0 && offset <= mmGB_TILE_MODE0 + 0x1f) {
+				*value = gDevice.fInfo.gfx.config.tile_mode_array[offset - mmGB_TILE_MODE0];
+				return 0;
+			}
 	}
 	printf("unknown register: %#" B_PRIx32 "\n", offset);
 	return -1;
@@ -112,23 +103,22 @@ int drmIoctlInt(ExternalPtr<TeamState> teamState, unsigned long request, void *a
 					case AMDGPU_INFO_DEV_INFO: {
 						struct drm_amdgpu_info_device *dev_info = (struct drm_amdgpu_info_device*)request->return_pointer;
 						memset(dev_info, 0, sizeof(struct drm_amdgpu_info_device));
-						dev_info->device_id = 0x683f;
-						dev_info->chip_rev = 0x1;
-						dev_info->external_rev = 0x29 /* CAPEVERDE */;
-						dev_info->pci_rev = 0x87;
+						dev_info->device_id = gDevice.SharedInfo()->pciID;
+						dev_info->chip_rev = gDevice.fInfo.rev_id;
+						dev_info->external_rev = gDevice.fInfo.external_rev_id;
+						dev_info->pci_rev = gDevice.SharedInfo()->pciRev;
 						dev_info->family = AMDGPU_FAMILY_SI;
-						dev_info->num_shader_engines = 1;
-						dev_info->num_shader_arrays_per_engine = 2;
-						dev_info->gpu_counter_freq = 0x6978;
-						dev_info->max_engine_clock = 0xc3500;
-						dev_info->max_memory_clock = 0x112a88;
-						dev_info->cu_active_number = 0x8;
-						dev_info->cu_ao_mask = 0x1e1e;
-						dev_info->cu_bitmap[0][0] = 0x1e;
-						dev_info->cu_bitmap[0][1] = 0x1e;
-						dev_info->enabled_rb_pipes_mask = 0xf;
-						dev_info->num_rb_pipes = 0x4;
-						dev_info->num_hw_gfx_contexts = 0x8;
+						dev_info->num_shader_engines = gDevice.fInfo.gfx.config.max_shader_engines;
+						dev_info->num_shader_arrays_per_engine = gDevice.fInfo.gfx.config.max_sh_per_se;
+						dev_info->gpu_counter_freq = 0x6978; // !!!
+						dev_info->max_engine_clock = 0xc3500; // !!!
+						dev_info->max_memory_clock = 0x112a88; // !!!
+						dev_info->cu_active_number = gDevice.fInfo.gfx.cu_info.number;
+						dev_info->cu_ao_mask = gDevice.fInfo.gfx.cu_info.ao_cu_mask;
+						memcpy(&dev_info->cu_bitmap[0], &gDevice.fInfo.gfx.cu_info.bitmap[0], sizeof(gDevice.fInfo.gfx.cu_info.bitmap));
+						dev_info->enabled_rb_pipes_mask = gDevice.fInfo.gfx.config.backend_enable_mask;
+						dev_info->num_rb_pipes = gDevice.fInfo.gfx.config.max_backends_per_se * gDevice.fInfo.gfx.config.max_shader_engines;
+						dev_info->num_hw_gfx_contexts = gDevice.fInfo.gfx.config.max_hw_contexts;
 						dev_info->virtual_address_offset = 0x200000;
 						dev_info->virtual_address_max = 0xfffe00000;
 						dev_info->virtual_address_alignment = 0x1000;
@@ -137,19 +127,29 @@ int drmIoctlInt(ExternalPtr<TeamState> teamState, unsigned long request, void *a
 						dev_info->ce_ram_size = 0x8000;
 						dev_info->vram_type = 0x5;
 						dev_info->vram_bit_width = 0x80;
-						dev_info->num_shader_visible_vgprs = 0x100;
-						dev_info->num_cu_per_sh = 0x5;
-						dev_info->num_tcc_blocks = 0x4;
-						dev_info->max_gs_waves_per_vgt = 0x20;
-						dev_info->cu_ao_bitmap[0][0] = 0x1e;
-						dev_info->cu_ao_bitmap[0][1] = 0x1e;
-	
+						dev_info->num_shader_visible_vgprs = gDevice.fInfo.gfx.config.max_gprs;
+						dev_info->num_cu_per_sh = gDevice.fInfo.gfx.config.max_cu_per_sh;
+						dev_info->num_tcc_blocks = gDevice.fInfo.gfx.config.max_texture_channel_caches;
+						dev_info->max_gs_waves_per_vgt = gDevice.fInfo.gfx.config.max_gs_threads;
+						memcpy(&dev_info->cu_ao_bitmap[0], &gDevice.fInfo.gfx.cu_info.ao_cu_bitmap[0], sizeof(gDevice.fInfo.gfx.cu_info.ao_cu_bitmap));
+
 						return 0;
 					}
 					case AMDGPU_INFO_READ_MMR_REG: {
+						uint32_t seNum = (request->read_mmr_reg.instance >> AMDGPU_INFO_MMR_SE_INDEX_SHIFT) & AMDGPU_INFO_MMR_SE_INDEX_MASK;
+						uint32_t shNum = (request->read_mmr_reg.instance >> AMDGPU_INFO_MMR_SH_INDEX_SHIFT) & AMDGPU_INFO_MMR_SH_INDEX_MASK;
+						if (seNum == AMDGPU_INFO_MMR_SE_INDEX_MASK)
+							seNum = 0xffffffff;
+						else if (seNum >= AMDGPU_GFX_MAX_SE)
+							return EINVAL;
+						if (shNum == AMDGPU_INFO_MMR_SH_INDEX_MASK)
+							shNum = 0xffffffff;
+						else if (shNum >= AMDGPU_GFX_MAX_SH_PER_SE)
+							return EINVAL;
+
 						uint32_t *values = (uint32_t*)request->return_pointer;
 						for (uint32_t i = 0; i < request->read_mmr_reg.count; i++) {
-							int res = drmAmdgpuReadMmrReg(request->read_mmr_reg.dword_offset + i, &values[i]);
+							int res = drmAmdgpuReadMmrReg(request->read_mmr_reg.dword_offset + i, seNum, shNum, &values[i]);
 							if (res != 0)
 								return res;
 						}
@@ -202,12 +202,12 @@ int drmIoctlInt(ExternalPtr<TeamState> teamState, unsigned long request, void *a
 						meminfo->vram.usable_heap_size = 0x7e380000;
 						meminfo->vram.heap_usage = 0x2664000;
 						meminfo->vram.max_allocation = 0x5eaa0000;
-	
+
 						meminfo->cpu_accessible_vram.total_heap_size = 0x10000000;
 						meminfo->cpu_accessible_vram.usable_heap_size = 0xf378000;
 						meminfo->cpu_accessible_vram.heap_usage = 0x1290000;
 						meminfo->cpu_accessible_vram.max_allocation = 0xb69a000;
-	
+
 						meminfo->gtt.total_heap_size = 0xc0000000;
 						meminfo->gtt.usable_heap_size = 0xbfddd000;
 						meminfo->gtt.heap_usage = 0xce1000;
@@ -407,7 +407,7 @@ int drmIoctlInt(ExternalPtr<TeamState> teamState, unsigned long request, void *a
 					case AMDGPU_VA_OP_MAP: {
 						return teamState.Switch()->Map(args->va_address, args->handle, args->offset_in_bo, args->map_size, 0);
 					}
-					case AMDGPU_VA_OP_UNMAP: 
+					case AMDGPU_VA_OP_UNMAP:
 					case AMDGPU_VA_OP_CLEAR: {
 						return teamState.Switch()->Unmap(args->va_address, args->handle, args->offset_in_bo, args->map_size, 0);
 					}
@@ -448,7 +448,7 @@ int drmIoctlInt(ExternalPtr<TeamState> teamState, unsigned long request, void *a
 				cs->signalPoints.SetTo(new uint64[cs->signalCnt]);
 				uint32 ibIdx = 0;
 				uint32 waitIdx = 0, signalIdx = 0;
-				
+
 				for (size_t i = 0; i < args->in.num_chunks; i++) {
 					switch(chunks[i]->chunk_id) {
 						case AMDGPU_CHUNK_ID_IB: {
@@ -522,7 +522,7 @@ int drmIoctlInt(ExternalPtr<TeamState> teamState, unsigned long request, void *a
 			auto args = (struct drm_gem_close*)arg;
 			return teamState.Switch()->FreeHandle(args->handle);
 		}
-		
+
 		// syncobj
 		case DRM_IOCTL_SYNCOBJ_CREATE: {
 			auto args = (struct drm_syncobj_create*)arg;

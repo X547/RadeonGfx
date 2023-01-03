@@ -14,6 +14,7 @@
 #include "bif_3_0_d.h"
 #include "bif_3_0.h"
 #include "oss_1_0_d.h"
+#include "oss_1_0.h"
 #include "gmc_6_0_d.h"
 #include "gmc_6_0.h"
 //#include "si_enums.h"
@@ -1250,6 +1251,7 @@ static void gfx_v6_0_config_init(struct amdgpu_device *adev)
 	adev->gfx.config.double_offchip_lds_buf = 0;
 }
 
+
 // #pragma mark -
 
 static void gfx_v6_0_constants_init(struct amdgpu_device *adev)
@@ -1260,8 +1262,13 @@ static void gfx_v6_0_constants_init(struct amdgpu_device *adev)
 	uint32 hdp_host_path_cntl;
 	uint32 tmp;
 
+	adev->rev_id = CcDrmIdStraps{.val = ReadReg4AmdGpu(CC_DRM_ID_STRAPS)}.atiRevId;
+	adev->external_rev_id = 0xFF;
 	switch (adev->asic_type) {
 	case CHIP_TAHITI:
+		adev->external_rev_id = (adev->rev_id == 0) ? 1 :
+					(adev->rev_id == 1) ? 5 : 6;
+
 		adev->gfx.config.max_shader_engines = 2;
 		adev->gfx.config.max_tile_pipes = 12;
 		adev->gfx.config.max_cu_per_sh = 8;
@@ -1279,6 +1286,8 @@ static void gfx_v6_0_constants_init(struct amdgpu_device *adev)
 		gb_addr_config.val = TAHITI_GB_ADDR_CONFIG_GOLDEN;
 		break;
 	case CHIP_PITCAIRN:
+		adev->external_rev_id = adev->rev_id + 20;
+
 		adev->gfx.config.max_shader_engines = 2;
 		adev->gfx.config.max_tile_pipes = 8;
 		adev->gfx.config.max_cu_per_sh = 5;
@@ -1296,6 +1305,8 @@ static void gfx_v6_0_constants_init(struct amdgpu_device *adev)
 		gb_addr_config.val = TAHITI_GB_ADDR_CONFIG_GOLDEN;
 		break;
 	case CHIP_VERDE:
+		adev->external_rev_id = adev->rev_id + 40;
+
 		adev->gfx.config.max_shader_engines = 1;
 		adev->gfx.config.max_tile_pipes = 4;
 		adev->gfx.config.max_cu_per_sh = 5;
@@ -1313,6 +1324,8 @@ static void gfx_v6_0_constants_init(struct amdgpu_device *adev)
 		gb_addr_config.val = VERDE_GB_ADDR_CONFIG_GOLDEN;
 		break;
 	case CHIP_OLAND:
+		adev->external_rev_id = 60;
+
 		adev->gfx.config.max_shader_engines = 1;
 		adev->gfx.config.max_tile_pipes = 4;
 		adev->gfx.config.max_cu_per_sh = 6;
@@ -1330,6 +1343,8 @@ static void gfx_v6_0_constants_init(struct amdgpu_device *adev)
 		gb_addr_config.val = VERDE_GB_ADDR_CONFIG_GOLDEN;
 		break;
 	case CHIP_HAINAN:
+		adev->external_rev_id = 70;
+
 		adev->gfx.config.max_shader_engines = 1;
 		adev->gfx.config.max_tile_pipes = 4;
 		adev->gfx.config.max_cu_per_sh = 5;

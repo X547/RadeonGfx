@@ -133,6 +133,8 @@ struct amdgpu_cu_info {
 struct amdgpu_device {
 	uint32 asic_type;
 	uint32 flags;
+	uint32 rev_id;
+	uint32 external_rev_id;
 	Mutex grbm_idx_mutex;
 	struct {
 		amdgpu_gfx_config config;
