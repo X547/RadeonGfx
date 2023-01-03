@@ -1,6 +1,7 @@
 #include "DrmInterface.h"
 #include <SupportDefs.h>
 #include "Radeon.h"
+#include "RadeonFirmware.h"
 #include "RadeonMemory.h"
 #include "gfx_6_0_d.h"
 #include "gmc_6_0_d.h"
@@ -218,25 +219,24 @@ int drmIoctlInt(ExternalPtr<TeamState> teamState, unsigned long request, void *a
 						struct drm_amdgpu_info_firmware *firmware = (struct drm_amdgpu_info_firmware*)request->return_pointer;
 						switch (request->query_fw.fw_type) {
 							case AMDGPU_INFO_FW_GFX_ME: {
-								firmware->ver = 0x91;
-								firmware->feature = 0x1d;
+								auto hdr = (const struct gfx_firmware_header_v1_0*)gDevice.fFirmwares.me.data.Get();
+								firmware->ver = B_LENDIAN_TO_HOST_INT32(hdr->header.ucode_version);
+								firmware->feature = B_LENDIAN_TO_HOST_INT32(hdr->ucode_feature_version);
 								return 0;
 							}
 							case AMDGPU_INFO_FW_GFX_PFP: {
-								firmware->ver = 0x54;
-								firmware->feature = 0x1d;
+								auto hdr = (const struct gfx_firmware_header_v1_0*)gDevice.fFirmwares.pfp.data.Get();
+								firmware->ver = B_LENDIAN_TO_HOST_INT32(hdr->header.ucode_version);
+								firmware->feature = B_LENDIAN_TO_HOST_INT32(hdr->ucode_feature_version);
 								return 0;
 							}
 							case AMDGPU_INFO_FW_GFX_CE: {
-								firmware->ver = 0x3d;
-								firmware->feature = 0x1d;
+								auto hdr = (const struct gfx_firmware_header_v1_0*)gDevice.fFirmwares.ce.data.Get();
+								firmware->ver = B_LENDIAN_TO_HOST_INT32(hdr->header.ucode_version);
+								firmware->feature = B_LENDIAN_TO_HOST_INT32(hdr->ucode_feature_version);
 								return 0;
 							}
-							case AMDGPU_INFO_FW_UVD: {
-								firmware->ver = 0x40000d00;
-								firmware->feature = 0;
-								return 0;
-							}
+							case AMDGPU_INFO_FW_UVD:
 							case AMDGPU_INFO_FW_VCE: {
 								firmware->ver = 0;
 								firmware->feature = 0;
