@@ -8,6 +8,7 @@
 #include "BitfieldAllocator.h"
 #include "SADomains/Domains.h"
 #include "SADomains/DomainCondVars.h"
+#include "FdObject.h"
 
 struct BufferObject;
 class AddressSpace;
@@ -31,7 +32,7 @@ enum MemoryDomain {
 #define R600_PTE_FRAG_256KB	(6 << 7)
 
 
-struct BufferObject: public BReferenceable {
+struct BufferObject: public FdObject {
 	// not used yet
 	struct Info {
 		uint64 size;
@@ -112,7 +113,7 @@ public:
 	BReference<BufferObject> Lookup(uint64 mapAdr, uint64 &offset);
 	status_t Map(BReference<BufferObject> buffer, uint64 mapAdr, uint64 offset, uint64 size);
 	status_t Unmap(BReference<BufferObject> buffer, uint64 mapAdr, uint64 offset, uint64 size);
-	
+
 	int32 AcquireVmid();
 	void ReleaseVmid();
 };
@@ -136,7 +137,7 @@ private:
 
 	MappedBuffer fWritebackBuf;
 	ExternalAllocator fWritebackPool;
-	
+
 public:
 	BReference<BufferObject> fDummyPage;
 	BReference<BufferObject> fVramScratch;

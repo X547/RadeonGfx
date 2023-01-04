@@ -6,6 +6,7 @@
 #include "Locks/Mutex.h"
 #include "Locks/RecursiveLock.h"
 #include "Locks/ConditionVariable.h"
+#include "FdObject.h"
 
 #include "Fence.h"
 
@@ -13,37 +14,31 @@
 class Syncobj;
 typedef BReference<Syncobj> SyncobjRef;
 
-class Syncobj: public BReferenceable {
+class Syncobj: public FdObject {
 public:
-	struct CreateFlags {
-		union {
-			struct {
-				uint32 signaled: 1;
-			};
-			uint32 val;
+	union CreateFlags {
+		struct {
+			uint32 signaled: 1;
 		};
+		uint32 val;
 	};
-	struct QueryFlags {
-		union {
-			struct {
-				uint32 lastSubmitted: 1;
-			};
-			uint32 val;
+	union QueryFlags {
+		struct {
+			uint32 lastSubmitted: 1;
 		};
+		uint32 val;
 	};
-	struct WaitFlags {
-		union {
-			struct {
-				// Fence::WaitFlags
-				uint32 absoluteTimeout: 1;
-				uint32 all: 1;
-				uint32 domain: 1;
+	union WaitFlags {
+		struct {
+			// Fence::WaitFlags
+			uint32 absoluteTimeout: 1;
+			uint32 all: 1;
+			uint32 domain: 1;
 
-				uint32 forSubmit: 1;
-				uint32 available: 1;
-			};
-			uint32 val;
+			uint32 forSubmit: 1;
+			uint32 available: 1;
 		};
+		uint32 val;
 	};
 
 private:
