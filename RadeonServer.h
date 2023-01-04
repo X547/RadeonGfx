@@ -3,6 +3,8 @@
 #include <ServerThreadLink.h>
 
 
+#define RADEON_GFX_SERVER_SIGNATURE "application/x-vnd.X512-RadeonGfx"
+
 enum {
 	// DRM
 	radeonMmapMsg = userMsgBase,
@@ -12,7 +14,7 @@ enum {
 	radeonListTeams,
 	radeonListBuffers,
 	radeonGetMemoryUsage,
-	
+
 	radeonThermalQuery,
 	radeonSetClocks,
 	// display

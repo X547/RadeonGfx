@@ -159,7 +159,7 @@ public:
 };
 
 
-RadeonServer::RadeonServer(): BApplication("application/x-vnd.X512-RadeonGfx")
+RadeonServer::RadeonServer(): BApplication(RADEON_GFX_SERVER_SIGNATURE)
 {
 	BMessenger msgr(this);
 	__start_watching_system(-1,
