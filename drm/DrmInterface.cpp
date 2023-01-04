@@ -15,6 +15,7 @@ extern "C" {
 }
 #include <stdio.h>
 #include <string.h>
+#include <syscalls.h>
 
 
 ExternalPtr<TeamState> gTeamState;
@@ -522,6 +523,30 @@ int drmIoctlInt(ExternalPtr<TeamState> teamState, unsigned long request, void *a
 			auto args = (struct drm_gem_close*)arg;
 			return teamState.Switch()->FreeHandle(args->handle);
 		}
+		case DRM_IOCTL_PRIME_HANDLE_TO_FD: {
+			auto args = (struct drm_prime_handle*)arg;
+			BReference<BufferObject> buffer = teamState.Switch()->ThisBuffer(args->handle);
+			if (!buffer.IsSet()) return ENOENT;
+			int fd = buffer->AllocFd();
+			if (fd < 0) return B_ERROR;
+			args->fd = _kern_dup_foreign(B_CURRENT_TEAM, teamState.Switch()->Team(), fd, O_CLOEXEC);
+			CheckRet(args->fd);
+			return B_OK;
+		}
+		case DRM_IOCTL_PRIME_FD_TO_HANDLE: {
+			auto args = (struct drm_prime_handle*)arg;
+			FileDescriptorCloser fd(_kern_dup_foreign(teamState.Switch()->Team(), B_CURRENT_TEAM, args->fd, O_CLOEXEC));
+			if (!fd.IsSet()) return fd.Get();
+			struct stat st{};
+			CheckRet(fstat(fd.Get(), &st));
+			BReference<FdObject> obj(FdObject::Lookup({st.st_dev, st.st_ino}), true);
+			if (!obj.IsSet()) return ENOENT;
+			BufferObject *buffer = dynamic_cast<BufferObject*>(obj.Get());
+			if (buffer == NULL) return ENOENT;
+			args->handle = teamState.Switch()->RegisterHandle({.type = TeamState::HandleType::buffer, .ref = buffer});
+			CheckRet(args->handle);
+			return B_OK;
+		}
 
 		// syncobj
 		case DRM_IOCTL_SYNCOBJ_CREATE: {
@@ -536,6 +561,30 @@ int drmIoctlInt(ExternalPtr<TeamState> teamState, unsigned long request, void *a
 		case DRM_IOCTL_SYNCOBJ_DESTROY: {
 			auto args = (struct drm_syncobj_destroy*)arg;
 			return teamState.Switch()->FreeHandle(args->handle);
+		}
+		case DRM_IOCTL_SYNCOBJ_HANDLE_TO_FD: {
+			auto args = (struct drm_syncobj_handle*)arg;
+			BReference<Syncobj> syncobj = teamState.Switch()->ThisSyncobj(args->handle);
+			if (!syncobj.IsSet()) return ENOENT;
+			int fd = syncobj->AllocFd();
+			if (fd < 0) return B_ERROR;
+			args->fd = _kern_dup_foreign(B_CURRENT_TEAM, teamState.Switch()->Team(), fd, O_CLOEXEC);
+			CheckRet(args->fd);
+			return B_OK;
+		}
+		case DRM_IOCTL_SYNCOBJ_FD_TO_HANDLE: {
+			auto args = (struct drm_syncobj_handle*)arg;
+			FileDescriptorCloser fd(_kern_dup_foreign(teamState.Switch()->Team(), B_CURRENT_TEAM, args->fd, O_CLOEXEC));
+			if (!fd.IsSet()) return fd.Get();
+			struct stat st{};
+			CheckRet(fstat(fd.Get(), &st));
+			BReference<FdObject> obj(FdObject::Lookup({st.st_dev, st.st_ino}), true);
+			if (!obj.IsSet()) return ENOENT;
+			Syncobj *syncobj = dynamic_cast<Syncobj*>(obj.Get());
+			if (syncobj == NULL) return ENOENT;
+			args->handle = teamState.Switch()->RegisterHandle({.type = TeamState::HandleType::syncobj, .ref = syncobj});
+			CheckRet(args->handle);
+			return B_OK;
 		}
 		case DRM_IOCTL_SYNCOBJ_WAIT: {
 			auto args = (struct drm_syncobj_wait*)arg;

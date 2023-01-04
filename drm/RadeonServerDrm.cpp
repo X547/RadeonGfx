@@ -236,7 +236,7 @@ void RadeonHandleDrmMessage(BPrivate::PortLink &link, ExternalRef<TeamState> sta
 									chunk_data_handles.SetTo(new struct drm_amdgpu_bo_list_in());
 									link.Read(chunk_data_handles.Get(), sizeof(struct drm_amdgpu_bo_list_in));
 									chunks[i]->chunk_data = (addr_t)chunk_data_handles.Get();
-									
+
 									bo_info_array.SetTo(new uint8[chunk_data_handles->bo_info_size*chunk_data_handles->bo_number]);
 									link.Read(&bo_info_array[0], chunk_data_handles->bo_info_size*chunk_data_handles->bo_number);
 									chunk_data_handles->bo_info_ptr = (addr_t)&bo_info_array[0];
@@ -273,6 +273,24 @@ void RadeonHandleDrmMessage(BPrivate::PortLink &link, ExternalRef<TeamState> sta
 					link.Flush();
 					return;
 				}
+				case DRM_IOCTL_PRIME_HANDLE_TO_FD: {
+					struct drm_prime_handle args;
+					link.Read(&args.handle, sizeof(args.handle));
+					status_t res = drmIoctlInt(state, request, &args);
+					link.StartMessage(res);
+					link.Attach(&args.fd, sizeof(args.fd));
+					link.Flush();
+					return;
+				}
+				case DRM_IOCTL_PRIME_FD_TO_HANDLE: {
+					struct drm_prime_handle args;
+					link.Read(&args.fd, sizeof(args.fd));
+					status_t res = drmIoctlInt(state, request, &args);
+					link.StartMessage(res);
+					link.Attach(&args.handle, sizeof(args.handle));
+					link.Flush();
+					return;
+				}
 
 				// syncobj
 				case DRM_IOCTL_SYNCOBJ_CREATE: {
@@ -289,6 +307,24 @@ void RadeonHandleDrmMessage(BPrivate::PortLink &link, ExternalRef<TeamState> sta
 					link.Read(&args, sizeof(args));
 					status_t res = drmIoctlInt(state, request, &args);
 					link.StartMessage(res);
+					link.Flush();
+					return;
+				}
+				case DRM_IOCTL_SYNCOBJ_HANDLE_TO_FD: {
+					struct drm_syncobj_handle args;
+					link.Read(&args.handle, sizeof(args.handle));
+					status_t res = drmIoctlInt(state, request, &args);
+					link.StartMessage(res);
+					link.Attach(&args.fd, sizeof(args.fd));
+					link.Flush();
+					return;
+				}
+				case DRM_IOCTL_SYNCOBJ_FD_TO_HANDLE: {
+					struct drm_syncobj_handle args;
+					link.Read(&args.fd, sizeof(args.fd));
+					status_t res = drmIoctlInt(state, request, &args);
+					link.StartMessage(res);
+					link.Attach(&args.handle, sizeof(args.handle));
 					link.Flush();
 					return;
 				}
