@@ -3,6 +3,7 @@
 #include <VideoConsumer.h>
 #include <Accelerant.h>
 #include "RadeonInterrupts.h"
+#include "Syncobj.h"
 
 
 class DisplayConsumer final: public VideoConsumer
@@ -14,6 +15,7 @@ private:
 	uint32 fOrigGrphControl;
 	uint64 fOrigGpuPhysAdr;
 	ArrayDeleter<MappedBuffer> fBufs;
+	ArrayDeleter<BReference<Syncobj>> fSyncobjs;
 
 	status_t SetupSwapChain(const SwapChainSpec& spec);
 	status_t BindSwapChain();

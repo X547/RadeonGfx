@@ -8,6 +8,7 @@
 #include "dce_6_0.h"
 #include "dce_6_0_d.h"
 #include <stdio.h>
+#include <syscalls.h>
 
 #define RADEON_TILING_MACRO				0x1
 #define RADEON_TILING_MICRO				0x2
@@ -203,7 +204,7 @@ bool SetGrphControl(GrphControl &grphControl, color_space colorSpace, AmdgpuTili
 		grphControl.grphArrayMode = GRPH_ARRAY_1D_TILED_THIN1;
 
 	grphControl.grphPipeConfig = SI_ADDR_SURF_P4_8x16;
-	
+
 	return true;
 }
 
@@ -233,10 +234,11 @@ status_t DisplayConsumer::SetupSwapChain(const SwapChainSpec& spec)
 	SwapChain swapChain;
 	swapChain.size = sizeof(SwapChain);
 	swapChain.presentEffect = presentEffectSwap;
-	swapChain.bufferCnt = 2;
+	swapChain.bufferCnt = spec.bufferCnt;
 	ArrayDeleter<VideoBuffer> buffers(new VideoBuffer[swapChain.bufferCnt]);
 	swapChain.buffers = buffers.Get();
 	fBufs.SetTo(new MappedBuffer[swapChain.bufferCnt]);
+	fSyncobjs.SetTo(new BReference<Syncobj>[swapChain.bufferCnt]);
 	for (uint32 i = 0; i < swapChain.bufferCnt; i++) {
 		fBufs[i] = gDevice.MemMgr().Switch()->Alloc(boDomainVramMappable, fFbc.bytes_per_row*fDm.virtual_height);
 		buffers[i].id = i;
@@ -247,12 +249,17 @@ status_t DisplayConsumer::SetupSwapChain(const SwapChainSpec& spec)
 				break;
 			}
 			case bufferRefGpu: {
-				buffers[i].ref.gpu.team = Link().Team();
-				ExternalRef<TeamState> teamState = gTeamRoster.Switch()->ThisTeam(Link().Team(), false);
-				if (!teamState.IsSet()) return ENOENT;
-				buffers[i].ref.gpu.id = teamState.Switch()->RegisterHandle(
-					{.type = TeamState::HandleType::buffer, .ref = fBufs[i].buf}
-				);
+				buffers[i].ref.gpu.fd = -1;
+				buffers[i].ref.gpu.fenceFd = -1;
+				int fd = fBufs[i].buf->AllocFd();
+				if (fd < 0) return B_ERROR;
+				buffers[i].ref.gpu.fd = _kern_dup_foreign(B_CURRENT_TEAM, B_CURRENT_TEAM, fd, O_CLOEXEC);
+				CheckRet(buffers[i].ref.gpu.fd);
+				fSyncobjs[i].SetTo(new Syncobj({.signaled = true}), true);
+				fd = fSyncobjs[i]->AllocFd();
+				if (fd < 0) return B_ERROR;
+				buffers[i].ref.gpu.fenceFd = _kern_dup_foreign(B_CURRENT_TEAM, B_CURRENT_TEAM, fd, O_CLOEXEC);
+				CheckRet(buffers[i].ref.gpu.fd);
 				buffers[i].ref.offset = 0;
 				break;
 			}
@@ -284,7 +291,13 @@ status_t DisplayConsumer::BindSwapChain()
 	for (uint32 i = 0; i < GetSwapChain().bufferCnt; i++) {
 		switch (GetSwapChain().buffers[i].ref.kind) {
 			case bufferRefGpu: {
-				fBufs[i] = teamState.Switch()->ThisBuffer(GetSwapChain().buffers[i].ref.gpu.id);
+				struct stat st{};
+				CheckRet(fstat(GetSwapChain().buffers[i].ref.gpu.fd, &st));
+				BReference<FdObject> obj(FdObject::Lookup({st.st_dev, st.st_ino}), true);
+				if (!obj.IsSet()) return ENOENT;
+				BufferObject *buffer = dynamic_cast<BufferObject*>(obj.Get());
+				if (buffer == NULL) return ENOENT;
+				fBufs[i] = BReference(buffer);
 #if 0
 				AmdgpuTiling tilingInfo {.val = fBufs[i].buf->metadata.tiling_info};
 				printf("fBufs[%" B_PRIu32 "].tiling_info: %#" B_PRIx32 "\n", i, tilingInfo.val);
