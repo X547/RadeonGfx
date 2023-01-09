@@ -3,7 +3,6 @@
 #include "../RadeonServer.h"
 #include <ServerThreadLink.h>
 #include <Messenger.h>
-#include <kernel.h>
 #define _DEFAULT_SOURCE
 extern "C" {
 #include <xf86drm.h>
@@ -53,7 +52,7 @@ void *RadeonGfxAccelerant::DrmMmap(void *addr, size_t length, int prot, int flag
 		return NULL;
 
 	uint8* adr{};
-	if (IS_KERNEL_ADDRESS(info.address) && (info.protection & (B_READ_AREA | B_WRITE_AREA)) != 0) {
+	if (info.team == B_SYSTEM_TEAM && (info.protection & (B_READ_AREA | B_WRITE_AREA)) != 0) {
 		adr = (uint8*)info.address;
 	} else {
 		AreaDeleter mappedArea(clone_area("cloned buffer", (void**)&adr, B_ANY_ADDRESS, B_READ_AREA | B_WRITE_AREA | B_CLONEABLE_AREA, area));

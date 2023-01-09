@@ -21,10 +21,3 @@ public:
 	status_t DisplayGetConsumer(int32 crtc, BMessenger &consumer) final;
 	status_t DisplayUpdateCursor(int32 crtc, const CursorUpdateInfo &info) final;
 };
-
-
-extern "C" {
-
-status_t _EXPORT instantiate_accelerant(Accelerant **acc, int fd);
-
-};
