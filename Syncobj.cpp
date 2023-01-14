@@ -1,4 +1,6 @@
 #include "Syncobj.h"
+
+#include "CppUtils.h"
 #include "FenceGroup.h"
 #include <AutoDeleter.h>
 #include <private/shared/AutoLocker.h>
@@ -30,9 +32,9 @@ public:
 void Syncobj::FenceHandler::Do(Fence *fence)
 {
 	//TRACE("Syncobj::Handler::Do(%p)\n", fence);
-	auto item = (FenceItem*)((char*)this - offsetof(FenceItem, handler));
-	Syncobj *syncobj = item->base;
-	syncobj->fLastSignaled = item;
+	auto &item = ContainerOf(*this, &FenceItem::handler);
+	Syncobj *syncobj = item.base;
+	syncobj->fLastSignaled = &item;
 }
 
 
@@ -243,7 +245,7 @@ status_t Syncobj::WaitForSubmit(uint32 *firstSignaled, SyncobjRef *syncobjs, uin
 		.fences = new BReference<Fence>[count]
 	};
 	waitInfo.base.Init();
-	
+
 	class FenceWaitHandler: public Fence::Handler {
 	public:
 		WaitInfo *fWaitInfo;

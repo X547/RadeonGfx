@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CppUtils.h"
 #include <Referenceable.h>
 #include <util/AVLTree.h>
 #include <AutoDeleterPosix.h>
@@ -38,7 +39,7 @@ private:
 
 		inline Value* GetValue(AVLTreeNode* node) const
 		{
-			return (Value*)((char*)node - offsetof(FdObject, fNode));
+				return &ContainerOf(*node, &FdObject::fNode);
 		}
 
 		inline int Compare(const Key& a, const Value* b) const

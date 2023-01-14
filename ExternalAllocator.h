@@ -1,4 +1,5 @@
 #pragma once
+#include "CppUtils.h"
 #include <util/AVLTree.h>
 
 
@@ -17,7 +18,7 @@ private:
 
 			inline Value* GetValue(AVLTreeNode* node) const
 			{
-				return (Block*)((char*)node - offsetof(Block, fAdrNode));
+				return &ContainerOf(*node, &Block::fAdrNode);
 			}
 
 			inline int Compare(const Key& a, const Value* b) const
@@ -46,7 +47,7 @@ private:
 
 			inline Value* GetValue(AVLTreeNode* node) const
 			{
-				return (Block*)((char*)node - offsetof(Block, fSizeNode));
+				return &ContainerOf(*node, &Block::fSizeNode);
 			}
 
 			inline int Compare(const Key& a, const Value* b) const
@@ -91,6 +92,6 @@ public:
 
 	inline uint64_t TotalSize() {return fTotalSize;}
 	inline uint64_t AllocSize() {return fAllocSize;}
-	
+
 	void Dump();
 };

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include "CppUtils.h"
 #include "RadeonMemory.h"
 #include "Syncobj.h"
 #include "RingBuffer.h"
@@ -21,17 +22,17 @@ struct IndirectBufferDef {
 struct CommandSubmission {
 
 	struct WaitHandler: public Fence::Handler {
-		inline CommandSubmission &Base() {return *(CommandSubmission*)((char*)this - offsetof(CommandSubmission, waitHandler));}
+		inline CommandSubmission &Base() {return ContainerOf(*this, &CommandSubmission::waitHandler);}
 		void Do(Fence *fence) final;
 	} waitHandler;
 
 	struct FenceHandler: public Fence::Handler {
-		inline CommandSubmission &Base() {return *(CommandSubmission*)((char*)this - offsetof(CommandSubmission, handler));}
+		inline CommandSubmission &Base() {return ContainerOf(*this, &CommandSubmission::handler);}
 		void Do(Fence *fence) final;
 	} handler;
 
 	struct FenceResolvedReq: public AsyncRequest {
-		inline CommandSubmission &Base() {return *(CommandSubmission*)((char*)this - offsetof(CommandSubmission, fenceResolvedReq));}
+		inline CommandSubmission &Base() {return ContainerOf(*this, &CommandSubmission::fenceResolvedReq);}
 		using AsyncRequest::AsyncRequest;
 		virtual ~FenceResolvedReq() {}
 		void Do(Object *ptr) final;
