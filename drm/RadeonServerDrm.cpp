@@ -115,6 +115,7 @@ void RadeonHandleDrmMessage(BPrivate::PortLink &link, ExternalRef<TeamState> sta
 						}
 						link.StartMessage(ENOSYS);
 						link.Flush();
+						return;
 					}
 					case DRM_AMDGPU_CTX: {
 						union drm_amdgpu_ctx args;
