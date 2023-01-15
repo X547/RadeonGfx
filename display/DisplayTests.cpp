@@ -8,7 +8,7 @@
 #include "RadeonDevice.h"
 #include "RadeonInterrupts.h"
 #include "RingBuffer.h"
-#include "RingPackets.h"
+#include "Units/DmaV1RingPackets.h"
 #include "Atombios.h"
 #include "atom.h"
 #include "sid_amdgpu.h"
@@ -74,7 +74,7 @@ status_t ShowMemoryCtrlState()
 	printf("HDP_NONSURFACE_BASE: %#" B_PRIx64 "\n", (uint64)ReadReg4AmdGpu(mmHDP_NONSURFACE_BASE) << 8);
 	printf("HDP_NONSURFACE_INFO: %#" B_PRIx32 "\n", ReadReg4AmdGpu(mmHDP_NONSURFACE_INFO));
 	printf("HDP_NONSURFACE_SIZE: %#" B_PRIx32 "\n", ReadReg4AmdGpu(mmHDP_NONSURFACE_SIZE));
-	
+
 	return B_OK;
 }
 
@@ -82,7 +82,7 @@ status_t ShowCtrcState()
 {
 	for (uint32 i = 0; i < 6; i++) {
 		printf("%" B_PRIu32 "\n", i);
-		
+
 		//printf("  AFMT_AUDIO_PACKET_CONTROL: %#" B_PRIx32 "\n", ReadReg4AmdGpu(crtc_offsets[i] + AFMT_AUDIO_PACKET_CONTROL));
 		//printf("  AFMT_STATUS: %#" B_PRIx32 "\n", ReadReg4AmdGpu(crtc_offsets[i] + AFMT_STATUS));
 		printf("  CRTC_STATUS_FRAME_COUNT: %" B_PRIu32 "\n", ReadReg4AmdGpu(crtc_offsets[i] + CRTC_STATUS_FRAME_COUNT));
@@ -112,7 +112,7 @@ status_t ShowCtrcState()
 		printf("  GRPH_SWAP_CNTL: %#" B_PRIx32 "\n", ReadReg4AmdGpu(crtc_offsets[i] + mmGRPH_SWAP_CNTL));
 		printf("  GRPH_PRIMARY_SURFACE_ADDRESS: %#" B_PRIx64 "\n", (uint64)ReadReg4AmdGpu(crtc_offsets[i] + mmGRPH_PRIMARY_SURFACE_ADDRESS) + ((uint64)ReadReg4AmdGpu(crtc_offsets[i] + mmGRPH_PRIMARY_SURFACE_ADDRESS_HIGH) << 32));
 		printf("  GRPH_SECONDARY_SURFACE_ADDRESS: %#" B_PRIx64 "\n", (uint64)ReadReg4AmdGpu(crtc_offsets[i] + mmGRPH_SECONDARY_SURFACE_ADDRESS) + ((uint64)ReadReg4AmdGpu(crtc_offsets[i] + mmGRPH_SECONDARY_SURFACE_ADDRESS_HIGH) << 32));
-		
+
 		printf("  total frame: (%" B_PRIu32 ", %" B_PRIu32 ", %" B_PRIu32 ", %" B_PRIu32 ")\n",
 			ReadReg4AmdGpu(crtc_offsets[i] + mmGRPH_X_START),
 			ReadReg4AmdGpu(crtc_offsets[i] + mmGRPH_Y_START),
@@ -184,7 +184,7 @@ status_t TestMode()
 		union setPixelClock args{};
 		args.v6.ulCrtcPclkFreq.ucCRTC = i;
 		CheckRet(atom_execute_table(gDevice.Atom().Context(), index, (uint32*)&args));
-	/*	
+	/*
 		printf("args.v3.usPixelClock: %"    B_PRIu16 "\n", args.v3.usPixelClock);
 		printf("args.v3.usRefDiv: %"        B_PRIu16 "\n", args.v3.usRefDiv);
 		printf("args.v3.usFbDiv: %"         B_PRIu16 "\n", args.v3.usFbDiv);
@@ -239,7 +239,7 @@ status_t TestSetFramebuffer()
 
 	SetFramebuffer(crtcId, origGpuPhysAdr);
 	printf("[WAIT]"); fgetc(stdin);
-	
+
 	return B_OK;
 }
 
@@ -306,18 +306,18 @@ static void DisplayIrqHandler(void *arg, InterruptPacket &pkt)
 	for (uint32 i = 0; i < num_crtc; i++) {
 		printf("CRTC_STATUS_FRAME_COUNT[%" B_PRIu32 "]: %" B_PRIu32 "\n", i, ReadReg4AmdGpu(crtc_offsets[i] + CRTC_STATUS_FRAME_COUNT));
 	}
-	
+
 	if (pkt.srcId == 42) {
 		uint32 hpd_idx;
 		if (pkt.srcData < 6) {
-			
+
 			hpd_idx = pkt.srcData;
 			evergreen_hpd_set_polarity(hpd_idx);
 		} else if (pkt.srcData < 12) {
 			hpd_idx = pkt.srcData - 6;
 		}
 	}
-	
+
 	DisplayIrqAck();
 }
 
@@ -424,7 +424,7 @@ status_t TestDisplayConsumer()
 	BApplication app("application/x-vnd.X512-RadeonGfx");
 	ObjectDeleter<DisplayConsumer> consumer(new DisplayConsumer("RadeonGfxConsumer"));
 	app.AddHandler(consumer.Get());
-	
+
 	uint32 crtcId = 0;
 	display_mode mode{};
 	frame_buffer_config fbc{};
@@ -525,7 +525,7 @@ static void CopyDma(uint64 dstGpuAdr, uint64 srcGpuAdr, uint64 size)
 	}
 }
 
-template <typename Writer> 
+template <typename Writer>
 static void GenDmaFill(Writer &wr, uint64 dstAdr, uint32 srcVal, uint64 byteCnt)
 {
 	enum {blockSize = 0xffff8};
@@ -596,7 +596,7 @@ struct IBWriter {
 			auto ring = ringExt.Switch();
 			RingFence fence;
 			ring->Begin(8 + 5);
-			GetDmaPacketIb(*ring, ibMem.buf->gpuPhysAdr, Length(), 0);
+			GenDmaPacketIb(*ring, ibMem.buf->gpuPhysAdr, Length(), 0);
 			ring->WriteFence(&fence);
 			ring->End();
 			fence.Wait();
@@ -662,10 +662,10 @@ status_t TestDisplayDma()
 	frame_buffer_config fbc{};
 	uint64 origGpuPhysAdr = 0;
 	GetCurrentMode(mode, fbc, origGpuPhysAdr, crtcId);
-	
+
 	size_t size = fbc.bytes_per_row*mode.virtual_height;
 	MappedBuffer dstBuf(gDevice.MemMgr().Switch()->Alloc(boDomainVramMappable, size));
-	
+
 	enum {
 		count = 1000,
 	};
@@ -679,7 +679,7 @@ status_t TestDisplayDma()
 	bigtime_t t1 = system_time();
 	printf("%g FPS\n", (double)count/((t1 - t0)/1000000.0));
 	printf("[WAIT]"); fgetc(stdin);
-	
+
 	return B_OK;
 }
 
@@ -789,7 +789,7 @@ status_t TestDrawDma()
 status_t TestCursor()
 {
 	printf("TestCursor()\n");
-	
+
 	auto displayRoster = gDevice.Displays().Switch();
 	auto display = displayRoster->DisplayAt(0);
 
@@ -852,7 +852,7 @@ status_t TestCursor()
 		.enabled = false,
 	}));
 	printf("[WAIT]"); fgetc(stdin);
-	
+
 	return B_OK;
 }
 
@@ -860,7 +860,7 @@ status_t TestCursor()
 status_t TestDisplay()
 {
 	printf("TestDisplay()\n");
-	
+
 	CheckRet(ShowMemoryCtrlState());
 	//CheckRet(ShowCtrcState());
 	switch (5) {

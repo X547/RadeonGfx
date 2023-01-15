@@ -1,6 +1,6 @@
 #include "CommandSubmission.h"
 #include "TeamState.h"
-#include "RingPackets.h"
+#include "Units/GfxV6RingPackets.h"
 #include "FenceGroup.h"
 #include "bif_3_0_d.h"
 #include <stdio.h>
@@ -29,7 +29,7 @@ CommandSubmission::~CommandSubmission()
 	//printf("-%p.CommandSubmission()\n", this);
 	for (uint32 i = 0; i < indBufCnt; i++) {
 		IndirectBufferDef &ib = indBufs[i];
-		uint64 sizeAligned = (ib.size + B_PAGE_SIZE - 1) / B_PAGE_SIZE * B_PAGE_SIZE;
+		uint64 sizeAligned = RoundUp<uint64>(ib.size, B_PAGE_SIZE);
 		teamState->fVirtMemPool.Free(ib.vaRemapped);
 		if (teamState->fAddressSpace->Unmap(NULL, ib.vaRemapped, 0, sizeAligned) < B_OK) abort();
 	}
@@ -58,7 +58,7 @@ status_t CommandSubmission::Remap()
 {
 	for (uint32 i = 0; i < indBufCnt; i++) {
 		IndirectBufferDef &ib = indBufs[i];
-		uint64 sizeAligned = (ib.size + B_PAGE_SIZE - 1) / B_PAGE_SIZE * B_PAGE_SIZE;
+		uint64 sizeAligned = RoundUp<uint64>(ib.size, B_PAGE_SIZE);
 		uint64 offset;
 		ib.buf = teamState->fAddressSpace->Lookup(ib.va, offset);
 		if (!ib.buf.IsSet()) return B_ERROR;
@@ -100,7 +100,7 @@ void CommandSubmission::WaitHandler::Do(Fence *fence)
 			ring->WriteIb(cs->indBufs[i].vaRemapped, cs->indBufs[i].size/4, vmId);
 		}
 		if (cs->userFence.buffer.IsSet()) {
-			GenFence(*ring, cs->userFence.buffer->gpuPhysAdr + cs->userFence.offset, cs->seq);
+			GenFence(*ring, cs->userFence.buffer->gpuPhysAdr + cs->userFence.offset, cs->seq, {.is64Bit = true});
 		}
 		ring->WriteFence(cs->fence);
 		ring->End();

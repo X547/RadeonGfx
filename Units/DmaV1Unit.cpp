@@ -1,7 +1,7 @@
 #include "DmaV1Unit.h"
 #include "Radeon.h"
 #include "RingBuffer.h"
-#include "RingPackets.h"
+#include "DmaV1RingPackets.h"
 #include "RadeonInterrupts.h"
 #include "sid_amdgpu.h"
 
@@ -157,8 +157,8 @@ uint32 RadeonRingBufferDma::Rptr() {return *fRptrAdr /*ReadReg4AmdGpu(fRegs.rbRp
 uint32 RadeonRingBufferDma::Wptr() {return ReadReg4AmdGpu(fRegs.rbWptr);}
 void   RadeonRingBufferDma::SetWptr(uint32 val) {WriteReg4AmdGpu(fRegs.rbWptr, val);}
 void   RadeonRingBufferDma::WriteFence2() {GenDmaPacketFence(*this, fFenceGpuAdr, Wseq());}
-void   RadeonRingBufferDma::WriteIb(uint64 adr, uint32 count, uint32 vmId) {GetDmaPacketIb(*this, adr, count, vmId);}
-void   RadeonRingBufferDma::WriteVmFlush(uint32 vmId, uint64 pdAdr) {GetDmaPacketVmFlush(*this, vmId, pdAdr);}
+void   RadeonRingBufferDma::WriteIb(uint64 adr, uint32 count, uint32 vmId) {GenDmaPacketIb(*this, adr, count, vmId);}
+void   RadeonRingBufferDma::WriteVmFlush(uint32 vmId, uint64 pdAdr) {GenDmaPacketVmFlush(*this, vmId, pdAdr);}
 
 
 // #pragma mark - DmaV1Unit

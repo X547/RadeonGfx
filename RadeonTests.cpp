@@ -4,7 +4,7 @@
 #include "RadeonMemory.h"
 #include "RadeonDevice.h"
 #include "RingBuffer.h"
-#include "RingPackets.h"
+#include "Units/DmaV1RingPackets.h"
 #include "Atombios.h"
 #include "atom.h"
 #include "gfx_6_0_d.h"
@@ -38,7 +38,7 @@ struct IBWriter {
 	uint32 *testIbAdr, *testIbPos;
 
 	IBWriter(uint32 *adr): testIbAdr(adr), testIbPos(adr) {}
-	
+
 	size_t Length() {return testIbPos - testIbAdr;}
 
 	void Write(uint32 val)
@@ -78,7 +78,7 @@ static uint32 GenDmaCopyLen(uint64 byteCnt)
 status_t TestCopyVRAM(ExternalPtr<RadeonRingBuffer> ringExt)
 {
 	printf("TestCopyVRAM()\n");
-	
+
 	size_t size = 1024*1024*256;
 	MappedBuffer buf1(gDevice.MemMgr().Switch()->Alloc(boDomainGtt, size));
 	BReference<BufferObject> buf2(gDevice.MemMgr().Switch()->Alloc(boDomainVram, size));
@@ -129,7 +129,7 @@ status_t TestCopyVRAM(ExternalPtr<RadeonRingBuffer> ringExt)
 		printf("VRAM -> VRAM: %g\n", size / ((double)(t4 - t3) / 1000000.0));
 		printf("(2) memcmp: %d\n", memcmp(buf1.adr, buf3.adr, size));
 		ringExt.Switch()->WriteState();
-/*		
+/*
 		FILE *file = fopen("buffer.bin", "wb");
 		fwrite(buf3.adr, size, 1, file);
 		fclose(file);
