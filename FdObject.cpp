@@ -36,7 +36,10 @@ int FdObject::AllocFd()
 	printf("FdObject::AllocFd()\n");
 	MutexLocker lock(fLock);
 	if (!fFd.IsSet()) {
-		SetFd(shm_open(SHM_ANON, O_RDWR | O_CREAT | O_CLOEXEC, 0600));
+		int pipeFds[2]; // 0: read, 1: write
+		if (pipe(pipeFds) < 0) return -1;
+		close(pipeFds[1]);
+		SetFd(pipeFds[0]);
 		if (!fFd.IsSet()) return -1;
 		{
 			MutexLocker lock(fMapLock);
