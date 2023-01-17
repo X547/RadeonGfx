@@ -1,7 +1,7 @@
 #include "RingBuffer.h"
 #include "Radeon.h"
 #include "RingPackets.h"
-#include "RadeonInterrupts.h"
+#include "InterruptHandler.h"
 #include "gfx_6_0.h"
 
 #include <stdio.h>
@@ -125,7 +125,6 @@ status_t RadeonRingBuffer::WaitEmpty()
 
 void RadeonRingBuffer::UpdateFences()
 {
-	//printf("RadeonRingBuffer::UpdateFences()\n");
 	uint32 rseq = Rseq();
 	while (fFences.First() != NULL && ((int32)rseq - (int32)fFences.First()->Seq() >= 0)) {
 		RingFence *fence = fFences.RemoveHead();

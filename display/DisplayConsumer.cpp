@@ -339,7 +339,7 @@ DisplayConsumer::~DisplayConsumer()
 
 	WriteReg4AmdGpu(crtc_offsets[fCrtcId] + mmGRPH_INTERRUPT_CONTROL, 0);
 
-	gDevice.IntRing().Switch()->UninstallHandler(0, 8 + 2*fCrtcId);
+	gDevice.IntHandler().Switch()->UninstallHandler(0, 8 + 2*fCrtcId);
 }
 
 status_t DisplayConsumer::Init(uint32 crtcId, const display_mode &dm, const frame_buffer_config &fbc)
@@ -357,9 +357,7 @@ status_t DisplayConsumer::Init(uint32 crtcId, const display_mode &dm, const fram
 	DumpGrphControl(GrphControl{.val = fOrigGrphControl});
 #endif
 
-	gDevice.IntRing().Switch()->InstallHandler(0, 8 + 2*fCrtcId, [](void *arg, InterruptPacket &pkt) {
-		((DisplayConsumer*)arg)->IrqHandler(pkt);
-	}, this);
+	gDevice.IntHandler().Switch()->InstallHandler(0, 8 + 2*fCrtcId, &fIntSource);
 
 	WriteReg4AmdGpu(crtc_offsets[fCrtcId] + mmGRPH_FLIP_CONTROL, 0);
 	WriteReg4AmdGpu(crtc_offsets[fCrtcId] + mmGRPH_INTERRUPT_CONTROL, GrphInterruptControl{.grphPflipIntMask = true}.val);
@@ -403,10 +401,16 @@ void DisplayConsumer::Present(int32 bufferId, const BRegion* dirty)
 }
 
 
-void DisplayConsumer::IrqHandler(InterruptPacket &pkt)
+status_t DisplayConsumer::InterruptSource::Enable(bool doEnable)
 {
-	printf("DisplayConsumer::IrqHandler: %" B_PRIu32 "\n", pkt.srcId);
+	// TODO
+	return B_OK;
+}
+
+void DisplayConsumer::InterruptSource::InterruptReceived(InterruptPacket &pkt)
+{
+	printf("DisplayConsumer::InterruptReceived: %" B_PRIu32 "\n", pkt.srcId);
 	PresentedInfo presentedInfo {};
-	Presented(presentedInfo);
+	Base().Presented(presentedInfo);
 	DisplayIrqAck();
 }

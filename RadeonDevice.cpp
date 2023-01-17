@@ -3,7 +3,7 @@
 #include "RadeonMemory.h"
 #include "DisplayRoster.h"
 #include "RingBuffer.h"
-#include "RadeonInterrupts.h"
+#include "InterruptHandler.h"
 #include "RadeonInit.h"
 #include "RadeonFirmware.h"
 #include "RadeonUnit.h"
@@ -57,8 +57,7 @@ RadeonDevice::RadeonDevice():
 RadeonDevice::~RadeonDevice()
 {
 	printf("-RadeonDevice\n");
-	fIntRing.Switch()->Disable();
-	fIntRing.Delete();
+	FiniUnits();
 	fMemMgr.Delete();
 }
 
@@ -114,6 +113,9 @@ status_t RadeonDevice::Init(int fd)
 
 	printf("fSharedInfo->frame_buffer_size: %#" B_PRIx32 "\n", fSharedInfo->frame_buffer_size);
 
+	printf("InstantiateUnits()\n");
+	CheckRet(InstantiateUnits(this));
+
 	fAtombios.SetTo(new Atombios());
 	if (!fAtombios.IsSet()) return B_NO_MEMORY;
 	printf("Atom()->Init()\n");
@@ -122,9 +124,6 @@ status_t RadeonDevice::Init(int fd)
 	printf("isPosted: %d\n", isPosted);
 	if (!isPosted)
 		atom_asic_init(Atom().Context());
-
-	fIntRing = MakeExternal<RadeonRingBufferInt>();
-	fIntRing.Switch()->Disable();
 
 	printf("MemMgr().Init()\n");
 	CheckRet(MemMgr().Switch()->Init());
@@ -146,15 +145,25 @@ status_t RadeonDevice::Init(int fd)
 	CheckRet(LoadMcMicrocode());
 	printf("init GART\n");
 	CheckRet(MemMgr().Switch()->InitGart());
-	
-	printf("disable interrupt ring\n");
-	fIntRing.Switch()->Disable();
+
+	printf("init interrupt handler\n");
+	for (RadeonUnit *unit = fUnits.First(); unit != NULL; unit = fUnits.GetNext(unit)) {
+		if (unit->GetInfo()->type == UnitType::ih) {
+			CheckRet(unit->InitSoftware());
+			CheckRet(unit->InitHardware());
+			CheckRet(unit->FiniHardware());
+		}
+	};
 
 	printf("InitGpu()\n");
 	CheckRet(InitGpu(&fInfo));
 
-	printf("init interrupt ring\n");
-	CheckRet(fIntRing.Switch()->Init(64 * 1024));
+	printf("enable interrupt handler\n");
+	for (RadeonUnit *unit = fUnits.First(); unit != NULL; unit = fUnits.GetNext(unit)) {
+		if (unit->GetInfo()->type == UnitType::ih) {
+			CheckRet(unit->InitHardware());
+		}
+	};
 
 //	for (uint32  i = 0; i < 6; i++)
 //		WriteReg4AmdGpu(DC_HPDx_INT_CONTROL(i), ReadReg4AmdGpu(DC_HPDx_INT_CONTROL(i)) | DC_HPDx_INT_EN | DC_HPDx_RX_INT_EN);
@@ -202,18 +211,8 @@ status_t RadeonDevice::Init(int fd)
 		WriteSet(grbmStatus); printf(")\n");
 	}
 
-	printf("PreinitGfxRings()\n");
-	PreinitGfxRings();
-
-	CheckRet(InstantiateUnits(this));
 	CheckRet(InitUnits());
 	snooze(10000);
-
-	printf("+InitCP()\n");
-	CheckRet(InitCP());
-	printf("-InitCP()\n");
-	snooze(10000);
-	printf("regs[CP_ME_CNTL]: %#" B_PRIx32 "\n", ReadReg4AmdGpu(CP_ME_CNTL));
 
 	printf("engine clock: %" B_PRIu32 "\n", radeon_gpu_get_engine_clock());
 	printf("memory clock: %" B_PRIu32 "\n", radeon_gpu_get_memory_clock());

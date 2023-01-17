@@ -6,7 +6,7 @@
 #include "DisplayRoster.h"
 #include "RadeonMemory.h"
 #include "RadeonDevice.h"
-#include "RadeonInterrupts.h"
+#include "InterruptHandler.h"
 #include "RingBuffer.h"
 #include "Units/DmaV1RingPackets.h"
 #include "Atombios.h"
@@ -298,9 +298,22 @@ static void evergreen_hpd_set_polarity(uint32 hpd)
 		WriteReg4AmdGpu(DC_HPDx_INT_CONTROL(hpd), ReadReg4AmdGpu(DC_HPDx_INT_CONTROL(hpd)) | DC_HPDx_INT_POLARITY);
 }
 
-static void DisplayIrqHandler(void *arg, InterruptPacket &pkt)
+class DisplayIrqHandler: public InterruptSource {
+public:
+	status_t Enable(bool doEnable);
+	void InterruptReceived(InterruptPacket &pkt);
+};
+
+static DisplayIrqHandler sDisplayIrqHandler;
+
+status_t DisplayIrqHandler::Enable(bool doEnable)
 {
-	(void)arg;
+	// TODO
+	return B_OK;
+}
+
+void DisplayIrqHandler::InterruptReceived(InterruptPacket &pkt)
+{
 	printf("DisplayIrqHandler: %" B_PRIu32 "\n", pkt.srcId);
 	uint32 num_crtc = 2;
 	for (uint32 i = 0; i < num_crtc; i++) {
@@ -334,7 +347,7 @@ status_t TestDisplayIrq()
 	};
 
 	for (uint32 i = 0; i < B_COUNT_OF(irqs); i++) {
-		gDevice.IntRing().Switch()->InstallHandler(0, irqs[i], DisplayIrqHandler, NULL);
+		gDevice.IntHandler().Switch()->InstallHandler(0, irqs[i], &sDisplayIrqHandler);
 	}
 
 	//WriteReg4AmdGpu(crtc_offsets[crtcId] + INT_MASK, VBLANK_INT_MASK);
@@ -366,9 +379,23 @@ static void FillBuffer(const display_mode &mode, const frame_buffer_config &fbc,
 	}
 }
 
-static void DisplayIrqHandler2(void *arg, InterruptPacket &pkt)
+
+class DisplayIrqHandler2: public InterruptSource {
+public:
+	status_t Enable(bool doEnable);
+	void InterruptReceived(InterruptPacket &pkt);
+};
+
+static DisplayIrqHandler2 sDisplayIrqHandler2;
+
+status_t DisplayIrqHandler2::Enable(bool doEnable)
 {
-	(void)arg;
+	// TODO
+	return B_OK;
+}
+
+void DisplayIrqHandler2::InterruptReceived(InterruptPacket &pkt)
+{
 	printf("DisplayIrqHandler2: %" B_PRIu32 "\n", pkt.srcId);
 	gCurBuf = (gCurBuf + 1)%2;
 	gFbc.frame_buffer = gBufs[gCurBuf].adr;
@@ -399,7 +426,7 @@ status_t TestDisplayIrq2()
 	};
 
 	for (uint32 i = 0; i < B_COUNT_OF(irqs); i++) {
-		gDevice.IntRing().Switch()->InstallHandler(0, irqs[i], DisplayIrqHandler2, NULL);
+		gDevice.IntHandler().Switch()->InstallHandler(0, irqs[i], &sDisplayIrqHandler2);
 	}
 
 	//WriteReg4AmdGpu(crtc_offsets[crtcId] + INT_MASK, VBLANK_INT_MASK);

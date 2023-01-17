@@ -6,7 +6,6 @@ struct amdgpu_device;
 
 
 void InitGoldenRegisters();
-status_t PreinitGfxRings();
 status_t InitCP();
 status_t InitGpu(amdgpu_device *dev);
 status_t InitMC();

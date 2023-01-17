@@ -2,52 +2,44 @@
 #include "Radeon.h"
 
 
-status_t RadeonUnit::InitHardware2() {return ENOSYS;}
-status_t RadeonUnit::FiniHardware2() {return ENOSYS;}
-status_t RadeonUnit::InitSoftware2() {return ENOSYS;}
-status_t RadeonUnit::FiniSoftware2() {return ENOSYS;}
+status_t RadeonUnit::InitSoftware2() {return B_OK;}
+status_t RadeonUnit::FiniSoftware2() {return B_OK;}
+status_t RadeonUnit::InitHardware2() {return B_OK;}
+status_t RadeonUnit::FiniHardware2() {return B_OK;}
 
 
 status_t RadeonUnit::InitHardware()
 {
-	if (fFlags & (1 << (uint32)UnitFlag::hardwareInit)) {
-		return B_OK;
-	}
-	status_t res = InitHardware2();
-	if (res != ENOSYS) CheckRet(res);
-	fFlags |= 1 << (uint32)UnitFlag::hardwareInit;
+	if (fFlags.hardwareInit) return B_OK;
+	printf("InitHardware(\"%s\")\n", GetInfo()->name);
+	CheckRet(InitHardware2());
+	fFlags.hardwareInit = true;
 	return B_OK;
 }
 
 status_t RadeonUnit::FiniHardware()
 {
-	if (!(fFlags & (1 << (uint32)UnitFlag::hardwareInit))) {
-		return B_OK;
-	}
-	status_t res = FiniHardware2();
-	if (res != ENOSYS) CheckRet(res);
-	fFlags &= ~(1 << (uint32)UnitFlag::hardwareInit);
+	if (!fFlags.hardwareInit) return B_OK;
+	printf("FiniHardware(\"%s\")\n", GetInfo()->name);
+	CheckRet(FiniHardware2());
+	fFlags.hardwareInit = false;
 	return B_OK;
 }
 
 status_t RadeonUnit::InitSoftware()
 {
-	if (fFlags & (1 << (uint32)UnitFlag::softwareInit)) {
-		return B_OK;
-	}
-	status_t res = InitSoftware2();
-	if (res != ENOSYS) CheckRet(res);
-	fFlags |= 1 << (uint32)UnitFlag::softwareInit;
+	if (fFlags.softwareInit) return B_OK;
+	printf("InitSoftware(\"%s\")\n", GetInfo()->name);
+	CheckRet(InitSoftware2());
+	fFlags.softwareInit = true;
 	return B_OK;
 }
 
 status_t RadeonUnit::FiniSoftware()
 {
-	if (!(fFlags & (1 << (uint32)UnitFlag::softwareInit))) {
-		return B_OK;
-	}
-	status_t res = FiniSoftware2();
-	if (res != ENOSYS) CheckRet(res);
-	fFlags &= ~(1 << (uint32)UnitFlag::softwareInit);
+	if (!fFlags.softwareInit) return B_OK;
+	printf("FiniSoftware(\"%s\")\n", GetInfo()->name);
+	CheckRet(FiniSoftware2());
+	fFlags.softwareInit = false;
 	return B_OK;
 }

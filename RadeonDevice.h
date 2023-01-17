@@ -30,7 +30,7 @@ class Atombios;
 class DisplayRoster;
 class MemoryManager;
 class RadeonRingBuffer;
-class RadeonRingBufferInt;
+class InterruptHandler;
 class RadeonUnit;
 
 
@@ -48,7 +48,7 @@ private:
 	ExternalPtr<MemoryManager> fMemMgr;
 	ExternalPtr<DisplayRoster> fDisplays;
 	ExternalPtr<RadeonRingBuffer> fRings[8];
-	ExternalPtr<RadeonRingBufferInt> fIntRing;
+	ExternalPtr<InterruptHandler> fIntHandler;
 
 	status_t InitUnits();
 	status_t FiniUnits();
@@ -87,12 +87,13 @@ public:
 
 	void InstallUnit(RadeonUnit *unit);
 	void InitRing(int ringId, ExternalPtr<RadeonRingBuffer> ring);
+	void SetIntHandler(ExternalPtr<InterruptHandler> val) {fIntHandler = val;}
 
 	Atombios &Atom() {return *fAtombios.Get();}
 	ExternalPtr<MemoryManager> MemMgr() {return fMemMgr;}
 	ExternalPtr<DisplayRoster> Displays() {return fDisplays;}
 	ExternalPtr<RadeonRingBuffer> Rings(int ringId) {return fRings[ringId];}
-	ExternalPtr<RadeonRingBufferInt> IntRing() {return fIntRing;}
+	ExternalPtr<InterruptHandler> IntHandler() {return fIntHandler;}
 };
 
 

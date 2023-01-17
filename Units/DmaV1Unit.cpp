@@ -2,7 +2,7 @@
 #include "Radeon.h"
 #include "RingBuffer.h"
 #include "DmaV1RingPackets.h"
-#include "RadeonInterrupts.h"
+#include "InterruptHandler.h"
 #include "sid_amdgpu.h"
 
 #include <stdio.h>
@@ -30,6 +30,14 @@ struct DmaRegs {
 class RadeonRingBufferDma final: public RadeonRingBuffer {
 private:
 	const DmaRegs &fRegs;
+
+	class InterruptSource: public ::InterruptSource {
+	public:
+		RadeonRingBufferDma &Base() {return ContainerOf(*this, &RadeonRingBufferDma::fIntSource);}
+
+		status_t Enable(bool doEnable) final;
+		void InterruptReceived(InterruptPacket &pkt) final;
+	} fIntSource;
 
 protected:
 	status_t Start() override;
@@ -101,6 +109,26 @@ static const DmaRegs &GetDmaRegs(RingType type)
 	abort();
 }
 
+
+status_t RadeonRingBufferDma::InterruptSource::Enable(bool doEnable)
+{
+	uint32 dmaCntl = ReadReg4AmdGpu(Base().fRegs.cntl);
+	if (doEnable) {
+		dmaCntl |= TRAP_ENABLE;
+	} else {
+		dmaCntl &= ~TRAP_ENABLE;
+	}
+	WriteReg4AmdGpu(Base().fRegs.cntl, dmaCntl);
+
+	return B_OK;
+}
+
+void RadeonRingBufferDma::InterruptSource::InterruptReceived(InterruptPacket &pkt)
+{
+	ExternalPtr(&Base()).Switch()->UpdateFences();
+}
+
+
 RadeonRingBufferDma::RadeonRingBufferDma(RingType type):
 	RadeonRingBuffer(type),
 	fRegs(GetDmaRegs(type))
@@ -110,10 +138,7 @@ RadeonRingBufferDma::~RadeonRingBufferDma() {}
 
 status_t RadeonRingBufferDma::Start()
 {
-	gDevice.IntRing().Switch()->InstallHandler(0, fRegs.irqSrcId, [](void *arg, InterruptPacket &pkt) {
-		(void)pkt;
-		ExternalPtr<RadeonRingBufferDma>((RadeonRingBufferDma*)arg).Switch()->UpdateFences();
-	}, this);
+	gDevice.IntHandler().Switch()->InstallHandler(0, fRegs.irqSrcId, &fIntSource);
 
 	WriteReg4AmdGpu(fRegs.semIncompleteTimerCntl, 0);
 	WriteReg4AmdGpu(fRegs.semWaitFailTimerCntl, 0);
@@ -137,6 +162,8 @@ status_t RadeonRingBufferDma::Start()
 	dmaCntl |= TRAP_ENABLE;
 	WriteReg4AmdGpu(fRegs.cntl, dmaCntl);
 
+	fIntSource.Enable(true);
+
 	WriteReg4AmdGpu(fRegs.rbWptr, 0);
 	WriteReg4AmdGpu(fRegs.rbCntl, dmaRbCntl | DMA_RB_ENABLE);
 
@@ -147,7 +174,7 @@ status_t RadeonRingBufferDma::Stop()
 {
 	WriteReg4AmdGpu(fRegs.rbCntl, ReadReg4AmdGpu(fRegs.rbCntl) & ~DMA_RB_ENABLE);
 	WriteReg4AmdGpu(fRegs.cntl, ReadReg4AmdGpu(fRegs.cntl) & ~TRAP_ENABLE);
-	gDevice.IntRing().Switch()->UninstallHandler(0, fRegs.irqSrcId);
+	gDevice.IntHandler().Switch()->UninstallHandler(0, fRegs.irqSrcId);
 	return B_OK;
 }
 
@@ -168,10 +195,10 @@ private:
 	ExternalUniquePtr<RadeonRingBuffer> fRings[2];
 
 protected:
-	status_t InitHardware2() override;
-	status_t FiniHardware2() override;
 	status_t InitSoftware2() override;
 	status_t FiniSoftware2() override;
+	status_t InitHardware2() override;
+	status_t FiniHardware2() override;
 
 public:
 	using DmaUnit::DmaUnit;
@@ -198,7 +225,7 @@ const UnitInfo *DmaV1Unit::GetInfo()
 	static const UnitInfo info {
 		.type = UnitType::sdma,
 		.version = {1, 0, 0},
-		.name = "SI DMA"
+		.name = "DMA v1.0"
 	};
 	return &info;
 }
@@ -209,6 +236,16 @@ static status_t InitRing(RadeonDevice *dev, ExternalUniquePtr<RadeonRingBuffer> 
 	if (!ring.IsSet()) return B_NO_MEMORY;
 	CheckRet(ring.Switch()->Init(size));
 	dev->InitRing(type, ring);
+	return B_OK;
+}
+
+status_t DmaV1Unit::InitSoftware2()
+{
+	return B_OK;
+}
+
+status_t DmaV1Unit::FiniSoftware2()
+{
 	return B_OK;
 }
 
@@ -227,16 +264,6 @@ status_t DmaV1Unit::InitHardware2()
 }
 
 status_t DmaV1Unit::FiniHardware2()
-{
-	return B_OK;
-}
-
-status_t DmaV1Unit::InitSoftware2()
-{
-	return B_OK;
-}
-
-status_t DmaV1Unit::FiniSoftware2()
 {
 	return B_OK;
 }
