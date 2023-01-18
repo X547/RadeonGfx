@@ -185,6 +185,26 @@ void InitGoldenRegisters()
 	}
 }
 
+
+status_t PreinitGfxRings()
+{
+	WriteReg4AmdGpu(mmCP_SEM_WAIT_TIMER, 0x0);
+	WriteReg4AmdGpu(mmCP_SEM_INCOMPLETE_TIMER_CNTL, 0x0);
+
+	/* Set the write pointer delay */
+	WriteReg4AmdGpu(mmCP_RB_WPTR_DELAY, 0);
+
+	WriteReg4AmdGpu(mmCP_DEBUG, 0);
+	//WriteReg4AmdGpu(mmSCRATCH_ADDR, ((gDevice.fWritebackBuf.buf->gpuPhysAdr + offsetof(ScratchBuffer, fences[0])) >> 8) & 0xFFFFFFFF);
+	WriteReg4AmdGpu(mmSCRATCH_ADDR, 0);
+
+	// WriteReg4AmdGpu(mmSCRATCH_UMSK, 0xff);
+	WriteReg4AmdGpu(mmSCRATCH_UMSK, 0);
+
+	return B_OK;
+}
+
+
 status_t InitCP()
 {
 	auto gfxRing = gDevice.Rings(RADEON_RING_TYPE_GFX_INDEX);

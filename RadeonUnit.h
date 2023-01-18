@@ -5,13 +5,9 @@
 
 class RadeonDevice;
 
-union UnitFlags {
-	struct {
-		uint32 softwareInit: 1;
-		uint32 hardwareInit: 1;
-		uint32 padding: 30;
-	};
-	uint32 val;
+enum class UnitFlag {
+	softwareInit,
+	hardwareInit,
 };
 
 enum class UnitType {
@@ -44,24 +40,24 @@ class RadeonUnit: public DoublyLinkedListLinkImpl<RadeonUnit> {
 private:
 	friend class RadeonDevice;
 	RadeonDevice *fDevice;
-	UnitFlags fFlags {};
+	uint32 fFlags;
 
 protected:
-	virtual status_t InitSoftware2();
-	virtual status_t FiniSoftware2();
 	virtual status_t InitHardware2();
 	virtual status_t FiniHardware2();
+	virtual status_t InitSoftware2();
+	virtual status_t FiniSoftware2();
 
 public:
-	RadeonUnit(RadeonDevice *device): fDevice(device) {}
+	RadeonUnit(RadeonDevice *device): fDevice(device), fFlags(0) {}
 	virtual ~RadeonUnit() {}
 	virtual const UnitInfo *GetInfo() = 0;
 
-	status_t InitSoftware();
-	status_t FiniSoftware();
 	status_t InitHardware();
 	status_t FiniHardware();
+	status_t InitSoftware();
+	status_t FiniSoftware();
 
 	inline RadeonDevice *Device() {return fDevice;}
-	inline UnitFlags Flags() {return fFlags;}
+	inline uint32 Flags() {return fFlags;}
 };

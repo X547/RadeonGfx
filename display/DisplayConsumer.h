@@ -2,7 +2,7 @@
 
 #include <VideoConsumer.h>
 #include <Accelerant.h>
-#include "InterruptHandler.h"
+#include "RadeonInterrupts.h"
 #include "Syncobj.h"
 
 
@@ -17,16 +17,10 @@ private:
 	ArrayDeleter<MappedBuffer> fBufs;
 	ArrayDeleter<BReference<Syncobj>> fSyncobjs;
 
-	class InterruptSource: public ::InterruptSource {
-	public:
-		DisplayConsumer &Base() {return ContainerOf(*this, &DisplayConsumer::fIntSource);}
-
-		status_t Enable(bool doEnable) final;
-		void InterruptReceived(InterruptPacket &pkt) final;
-	} fIntSource;
-
 	status_t SetupSwapChain(const SwapChainSpec& spec);
 	status_t BindSwapChain();
+
+	void IrqHandler(InterruptPacket &pkt);
 
 public:
 	DisplayConsumer(const char* name);

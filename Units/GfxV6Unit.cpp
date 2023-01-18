@@ -1,6 +1,6 @@
 #include "GfxUnit.h"
 #include "GfxV6RingPackets.h"
-#include "InterruptHandler.h"
+#include "RadeonInterrupts.h"
 #include "RadeonInit.h"
 #include "RadeonFirmware.h"
 #include "gfx_6_0.h"
@@ -96,14 +96,6 @@ class RadeonRingBufferGfx final: public RadeonRingBuffer {
 private:
 	const GfxRegs &fRegs;
 
-	class InterruptSource: public ::InterruptSource {
-	public:
-		RadeonRingBufferGfx &Base() {return ContainerOf(*this, &RadeonRingBufferGfx::fIntSource);}
-
-		status_t Enable(bool doEnable) final;
-		void InterruptReceived(InterruptPacket &pkt) final;
-	} fIntSource;
-
 protected:
 	status_t Start() override;
 	status_t Stop() override;
@@ -120,28 +112,6 @@ public:
 	void WriteVmFlush(uint32 vmId, uint64 pdAdr) override;
 };
 
-
-status_t RadeonRingBufferGfx::InterruptSource::Enable(bool doEnable)
-{
-	CpIntCntlRing0 intCntl{.val = ReadReg4AmdGpu(Base().fRegs.intCntl)};
-	intCntl.timeStampIntEnable = doEnable != false;
-	WriteReg4AmdGpu(Base().fRegs.intCntl, intCntl.val);
-
-	return B_OK;
-}
-
-void RadeonRingBufferGfx::InterruptSource::InterruptReceived(InterruptPacket &pkt)
-{
-	//ExternalPtr<RadeonRingBufferGfx>(&Base()).Switch()->UpdateFences();
-
-	switch (pkt.ringId) {
-	case RADEON_RING_TYPE_GFX_INDEX:
-	case CAYMAN_RING_TYPE_CP1_INDEX:
-	case CAYMAN_RING_TYPE_CP2_INDEX:
-		gDevice.Rings(pkt.ringId).Switch()->UpdateFences();
-		break;
-	}
-}
 
 RadeonRingBufferGfx::RadeonRingBufferGfx(RingType type):
 	RadeonRingBuffer(type),
@@ -170,8 +140,20 @@ status_t RadeonRingBufferGfx::Start()
 
 	WriteReg4AmdGpu(fRegs.rbBase, fBuffer.buf->gpuPhysAdr >> 8);
 
-	gDevice.IntHandler().Switch()->InstallHandler(0, intSrcIdCpEop, &fIntSource);
-	fIntSource.Enable(true);
+	gDevice.IntRing().Switch()->InstallHandler(0, intSrcIdCpEop, [](void *arg, InterruptPacket &pkt) {
+		(void)arg;
+		switch (pkt.ringId) {
+		case RADEON_RING_TYPE_GFX_INDEX:
+		case CAYMAN_RING_TYPE_CP1_INDEX:
+		case CAYMAN_RING_TYPE_CP2_INDEX:
+			gDevice.Rings(pkt.ringId).Switch()->UpdateFences();
+			break;
+		}
+	}, this);
+
+	CpIntCntlRing0 intCntl{.val = ReadReg4AmdGpu(fRegs.intCntl)};
+	intCntl.timeStampIntEnable = 1;
+	WriteReg4AmdGpu(fRegs.intCntl, intCntl.val);
 
 	return B_OK;
 }
@@ -199,10 +181,10 @@ private:
 	ExternalUniquePtr<RadeonRingBuffer> fComputeRings[2];
 
 protected:
-	status_t InitSoftware2() override;
-	status_t FiniSoftware2() override;
 	status_t InitHardware2() override;
 	status_t FiniHardware2() override;
+	status_t InitSoftware2() override;
+	status_t FiniSoftware2() override;
 
 public:
 	using GfxUnit::GfxUnit;
@@ -242,34 +224,6 @@ static status_t InitRing(RadeonDevice *dev, ExternalUniquePtr<RadeonRingBuffer> 
 	if (!ring.IsSet()) return B_NO_MEMORY;
 	CheckRet(ring.Switch()->Init(size));
 	dev->InitRing(type, ring);
-	return B_OK;
-}
-
-static status_t PreinitGfxRings()
-{
-	WriteReg4AmdGpu(mmCP_SEM_WAIT_TIMER, 0x0);
-	WriteReg4AmdGpu(mmCP_SEM_INCOMPLETE_TIMER_CNTL, 0x0);
-
-	/* Set the write pointer delay */
-	WriteReg4AmdGpu(mmCP_RB_WPTR_DELAY, 0);
-
-	WriteReg4AmdGpu(mmCP_DEBUG, 0);
-	//WriteReg4AmdGpu(mmSCRATCH_ADDR, ((gDevice.fWritebackBuf.buf->gpuPhysAdr + offsetof(ScratchBuffer, fences[0])) >> 8) & 0xFFFFFFFF);
-	WriteReg4AmdGpu(mmSCRATCH_ADDR, 0);
-
-	// WriteReg4AmdGpu(mmSCRATCH_UMSK, 0xff);
-	WriteReg4AmdGpu(mmSCRATCH_UMSK, 0);
-
-	return B_OK;
-}
-
-status_t GfxV6Unit::InitSoftware2()
-{
-	return B_OK;
-}
-
-status_t GfxV6Unit::FiniSoftware2()
-{
 	return B_OK;
 }
 
@@ -319,10 +273,9 @@ status_t GfxV6Unit::InitHardware2()
 		WriteSet(grbmStatus); printf(")\n");
 	}
 
-#endif
 	printf("PreinitGfxRings()\n");
 	PreinitGfxRings();
-
+#endif
 	static RingType gfxRingTypes[] = {RADEON_RING_TYPE_GFX_INDEX};
 	static RingType computeRingTypes[] = {CAYMAN_RING_TYPE_CP1_INDEX, CAYMAN_RING_TYPE_CP2_INDEX};
 	for (uint32 i = 0; i < B_COUNT_OF(fGfxRings); i++) {
@@ -332,17 +285,28 @@ status_t GfxV6Unit::InitHardware2()
 		CheckRet(InitRing(Device(), fComputeRings[i], [](RingType type) -> ExternalPtr<RadeonRingBuffer> {return MakeExternal<RadeonRingBufferGfx>(type);}, computeRingTypes[i], 0x2000));
 	}
 	snooze(10000);
-
+#if 0
+	//((RadeonRingBufferGfx&)*Rings(RADEON_RING_TYPE_GFX_INDEX).Switch()).SetResetOnBegin(true);
 	printf("+InitCP()\n");
 	CheckRet(InitCP());
 	printf("-InitCP()\n");
 	snooze(10000);
 	printf("regs[CP_ME_CNTL]: %#" B_PRIx32 "\n", ReadReg4AmdGpu(mmCP_ME_CNTL));
-
+#endif
 	return B_OK;
 }
 
 status_t GfxV6Unit::FiniHardware2()
+{
+	return B_OK;
+}
+
+status_t GfxV6Unit::InitSoftware2()
+{
+	return B_OK;
+}
+
+status_t GfxV6Unit::FiniSoftware2()
 {
 	return B_OK;
 }
