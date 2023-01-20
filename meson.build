@@ -29,6 +29,7 @@ ThreadLink = ThreadLinkProj.get_variable('ThreadLink')
 VideoStreams = dependency('libvideostreams')
 
 
+subdir('Sync')
 subdir('firmware')
 subdir('radeon_gfx.accelerant')
 
@@ -42,8 +43,6 @@ executable('RadeonGfx',
 		'RadeonInit2.cpp',
 		'RadeonFirmware.cpp',
 		'RadeonMemory.cpp',
-		'Fence.cpp',
-		'FenceGroup.cpp',
 		'RingBuffer.cpp',
 		'RadeonInterrupts.cpp',
 		'Poke.cpp',
@@ -53,7 +52,6 @@ executable('RadeonGfx',
 		'FdObject.cpp',
 		'TeamState.cpp',
 		'CommandSubmission.cpp',
-		'Syncobj.cpp',
 		'RadeonServer.cpp',
 		'RadeonPower.cpp',
 		'Atombios.cpp',
@@ -81,6 +79,7 @@ executable('RadeonGfx',
 		'/boot/system/develop/headers/private/system/arch/x86_64',
 	],
 	dependencies: [
+		dep_libsync,
 		dep_libbe,
 		dep_libgame,
 		dep_libdrm0,
