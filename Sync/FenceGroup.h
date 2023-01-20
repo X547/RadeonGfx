@@ -5,21 +5,17 @@
 
 class FenceGroup: public Fence {
 public:
-	struct CreateFlags {
-		union {
-			struct {
-				uint32 all: 1;
-			};
-			uint32 val;
+	union CreateFlags {
+		struct {
+			uint32 all: 1;
 		};
+		uint32 val;
 	};
-	struct Flags {
-		union {
-			struct {
-				uint32 all: 1;
-			};
-			uint32 val;
+	union Flags {
+		struct {
+			uint32 all: 1;
 		};
+		uint32 val;
 	};
 
 private:

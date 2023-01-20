@@ -12,23 +12,19 @@
 class Fence: public BReferenceable
 {
 public:
-	struct Flags {
-		union {
-			struct {
-				uint32 signaled: 1;
-			};
-			uint32 val;
+	union Flags {
+		struct {
+			uint32 signaled: 1;
 		};
+		uint32 val;
 	};
-	struct WaitFlags {
-		union {
-			struct {
-				uint32 absoluteTimeout: 1;
-				uint32 all: 1;
-				uint32 domain: 1;
-			};
-			uint32 val;
+	union WaitFlags {
+		struct {
+			uint32 absoluteTimeout: 1;
+			uint32 all: 1;
+			uint32 domain: 1;
 		};
+		uint32 val;
 	};
 
 private:
@@ -92,7 +88,7 @@ struct WaitInfoBase {
 	uint32 remainingCount;
 	Fence::WaitFlags flags;
 	bigtime_t timeout = B_INFINITE_TIMEOUT;
-	
+
 	~WaitInfoBase();
 
 	void Init();
