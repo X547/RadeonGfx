@@ -431,12 +431,10 @@ int drmIoctlInt(ExternalPtr<TeamState> teamState, unsigned long request, void *a
 					switch (chunks[i]->chunk_id) {
 						case AMDGPU_CHUNK_ID_IB: cs->indBufCnt++; break;
 						case AMDGPU_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT: {
-							struct drm_amdgpu_cs_chunk_syncobj *syncobj = (struct drm_amdgpu_cs_chunk_syncobj*)chunks[i]->chunk_data;
 							cs->waitCnt += chunks[i]->length_dw/(sizeof(struct drm_amdgpu_cs_chunk_syncobj)/4);
 							break;
 						}
 						case AMDGPU_CHUNK_ID_SYNCOBJ_TIMELINE_SIGNAL: {
-							struct drm_amdgpu_cs_chunk_syncobj *syncobj = (struct drm_amdgpu_cs_chunk_syncobj*)chunks[i]->chunk_data;
 							cs->signalCnt += chunks[i]->length_dw/(sizeof(struct drm_amdgpu_cs_chunk_syncobj)/4);
 							break;
 						}
