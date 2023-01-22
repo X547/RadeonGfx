@@ -54,34 +54,40 @@ void RadeonHandleDrmMessage(BPrivate::PortLink &link, ExternalRef<TeamState> sta
 						args.return_pointer = (addr_t)returnData.Get();
 						switch (args.query) {
 							case AMDGPU_INFO_ACCEL_WORKING:
+							case AMDGPU_INFO_HW_IP_INFO:
 							case AMDGPU_INFO_VRAM_USAGE:
 							case AMDGPU_INFO_GTT_USAGE:
 							case AMDGPU_INFO_GDS_CONFIG:
 							case AMDGPU_INFO_VRAM_GTT:
 							case AMDGPU_INFO_DEV_INFO:
 							case AMDGPU_INFO_VIS_VRAM_USAGE:
+							case AMDGPU_INFO_MEMORY:
 								// no input arguments
 								break;
+							case AMDGPU_INFO_FW_VERSION: {
+								link.Read(&args.query_fw, sizeof(args.query_fw));
+								break;
+							}
 							case AMDGPU_INFO_READ_MMR_REG: {
 								link.Read(&args.read_mmr_reg, sizeof(args.read_mmr_reg));
 								break;
 							}
+							case AMDGPU_INFO_VIDEO_CAPS: {
+								link.Read(&args.video_cap, sizeof(args.video_cap));
+								break;
+							}
 		/*
 							case AMDGPU_INFO_CRTC_FROM_ID:
-							case AMDGPU_INFO_HW_IP_INFO:
 							case AMDGPU_INFO_HW_IP_COUNT:
 							case AMDGPU_INFO_TIMESTAMP:
-							case AMDGPU_INFO_FW_VERSION:
 							case AMDGPU_INFO_NUM_BYTES_MOVED:
 							case AMDGPU_INFO_NUM_EVICTIONS:
-							case AMDGPU_INFO_MEMORY:
 							case AMDGPU_INFO_VCE_CLOCK_TABLE:
 							case AMDGPU_INFO_VBIOS:
 							case AMDGPU_INFO_SENSOR:
 							case AMDGPU_INFO_NUM_VRAM_CPU_PAGE_FAULTS:
 							case AMDGPU_INFO_VRAM_LOST_COUNTER:
 							case AMDGPU_INFO_RAS_ENABLED_FEATURES:
-							case AMDGPU_INFO_VIDEO_CAPS:
 								break;
 		*/
 							default:

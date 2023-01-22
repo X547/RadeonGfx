@@ -237,6 +237,7 @@ int drmIoctlInt(ExternalPtr<TeamState> teamState, unsigned long request, void *a
 								firmware->feature = B_LENDIAN_TO_HOST_INT32(hdr->ucode_feature_version);
 								return 0;
 							}
+							case AMDGPU_INFO_FW_GFX_MEC:
 							case AMDGPU_INFO_FW_UVD:
 							case AMDGPU_INFO_FW_VCE: {
 								firmware->ver = 0;
