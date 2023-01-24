@@ -6,23 +6,25 @@
 #include "AccelerantDisplay.h"
 #include <Messenger.h>
 #include <AutoDeleterPosix.h>
+#include <ClientThreadLink.h>
 
 
 class RadeonGfxAccelerant: public Accelerant, public AccelerantDrm, public AccelerantAmdgpu, public AccelerantDisplay {
 private:
 	FileDescriptorCloser fFd;
 	BMessenger fServerMsgr;
+	ClientThreadLinkConnection fConn;
 
 public:
 	RadeonGfxAccelerant(int fd);
 	virtual ~RadeonGfxAccelerant() = default;
 	status_t InitCheck();
 
-	void *QueryInterface(const char *iface) final;
+	void *QueryInterface(const char *iface, uint32 version) final;
 
 	/* DRM */
 	void *DrmMmap(void *addr, size_t length, int prot, int flags, off_t offset) final;
-	int DrmIoctl(unsigned long request, void *arg) final;
+	int DrmIoctl(uint32_t request, void *arg) final;
 
 	int DrmVersion(struct drm_version *version) final;
 

@@ -3,4 +3,4 @@
 #include "TeamState.h"
 
 
-int drmIoctlInt(ExternalPtr<TeamState> teamState, unsigned long request, void *arg);
+int drmIoctlInt(ExternalPtr<TeamState> teamState, uint32_t request, void *arg);

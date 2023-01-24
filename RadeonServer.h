@@ -8,7 +8,6 @@
 enum {
 	// DRM
 	radeonMmapMsg = userMsgBase,
-	radeonMunmapMsg,
 	radeonIoctlMsg,
 
 	radeonListTeams,

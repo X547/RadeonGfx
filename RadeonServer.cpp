@@ -21,7 +21,6 @@ void RadeonServerThreadLink::MessageReceived(int32 what)
 {
 	switch (what) {
 		case radeonMmapMsg:
-		case radeonMunmapMsg:
 		case radeonIoctlMsg:
 			return RadeonHandleDrmMessage(Link(), ThisState(), what);
 		case radeonListTeams: {

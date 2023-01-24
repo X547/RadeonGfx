@@ -1,7 +1,6 @@
 #include "RadeonGfxAccelerant.h"
 
 #include "../RadeonServer.h"
-#include <ServerThreadLink.h>
 #include <Messenger.h>
 #define _DEFAULT_SOURCE
 extern "C" {
@@ -29,29 +28,29 @@ RadeonGfxAccelerant::RadeonGfxAccelerant(int fd)
 {
 	fFd.SetTo(dup(fd));
 	fcntl(fFd.Get(), F_SETFD, FD_CLOEXEC);
-	fServerMsgr = BMessenger(RADEON_GFX_SERVER_SIGNATURE);
+	fConn.SetMessenger(BMessenger(RADEON_GFX_SERVER_SIGNATURE));
 }
 
 status_t RadeonGfxAccelerant::InitCheck()
 {
-	if (!fFd.IsSet() || !fServerMsgr.IsValid()) return B_ERROR;
+	if (!fFd.IsSet() || !fConn.Messenger().IsValid()) return B_ERROR;
 	return B_OK;
 }
 
-void *RadeonGfxAccelerant::QueryInterface(const char *iface)
+void *RadeonGfxAccelerant::QueryInterface(const char *iface, uint32 version)
 {
-	if (strcmp(iface, B_ACCELERANT_IFACE_DRM) == 0) {
+	if (strcmp(iface, B_ACCELERANT_IFACE_DRM) == 0 && version <= 0) {
 		return static_cast<AccelerantDrm*>(this);
 	}
-	if (strcmp(iface, B_ACCELERANT_IFACE_AMDGPU) == 0) {
+	if (strcmp(iface, B_ACCELERANT_IFACE_AMDGPU) == 0 && version <= 0) {
 		return static_cast<AccelerantAmdgpu*>(this);
 	}
 #if 0
-	if (strcmp(iface, B_ACCELERANT_IFACE_DISPLAY) == 0) {
+	if (strcmp(iface, B_ACCELERANT_IFACE_DISPLAY) == 0 && version <= 0) {
 		return static_cast<AccelerantDisplay*>(this);
 	}
 #endif
-	return Accelerant::QueryInterface(iface);
+	return Accelerant::QueryInterface(iface, version);
 }
 
 
@@ -64,7 +63,7 @@ void *RadeonGfxAccelerant::DrmMmap(void *addr, size_t length, int prot, int flag
 	(void)prot;
 	(void)flags;
 
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	link.StartMessage(radeonMmapMsg);
 	link.Attach<int32>((int32)offset);
@@ -92,8 +91,10 @@ void *RadeonGfxAccelerant::DrmMmap(void *addr, size_t length, int prot, int flag
 	return adr + areaOfs;
 }
 
-int RadeonGfxAccelerant::DrmIoctl(unsigned long request, void *arg)
+int RadeonGfxAccelerant::DrmIoctl(uint32 request, void *arg)
 {
+	(void)request;
+	(void)arg;
 	return ENOSYS;
 }
 
@@ -118,11 +119,11 @@ int RadeonGfxAccelerant::DrmVersion(struct drm_version *version)
 
 int RadeonGfxAccelerant::DrmCloseBufferHandle(uint32_t handle)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_IOCTL_GEM_CLOSE);
+	link.Attach<uint32_t>(DRM_IOCTL_GEM_CLOSE);
 	link.Attach<uint32_t>(handle);
 	link.Attach<uint32_t>(0); // pad
 	status_t reply;
@@ -134,11 +135,11 @@ int RadeonGfxAccelerant::DrmCloseBufferHandle(uint32_t handle)
 int RadeonGfxAccelerant::DrmPrimeHandleToFD(uint32_t handle, uint32_t flags, int *prime_fd)
 {
 	(void)flags;
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_IOCTL_PRIME_HANDLE_TO_FD);
+	link.Attach<uint32_t>(DRM_IOCTL_PRIME_HANDLE_TO_FD);
 	link.Attach<uint32_t>(handle);
 	status_t reply;
 	link.FlushWithReply(reply);
@@ -149,11 +150,11 @@ int RadeonGfxAccelerant::DrmPrimeHandleToFD(uint32_t handle, uint32_t flags, int
 
 int RadeonGfxAccelerant::DrmPrimeFDToHandle(int prime_fd, uint32_t *handle)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_IOCTL_PRIME_FD_TO_HANDLE);
+	link.Attach<uint32_t>(DRM_IOCTL_PRIME_FD_TO_HANDLE);
 	link.Attach<int>(prime_fd);
 	status_t reply;
 	link.FlushWithReply(reply);
@@ -165,11 +166,11 @@ int RadeonGfxAccelerant::DrmPrimeFDToHandle(int prime_fd, uint32_t *handle)
 
 int RadeonGfxAccelerant::DrmSyncobjCreate(uint32_t flags, uint32_t *handle)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_IOCTL_SYNCOBJ_CREATE);
+	link.Attach<uint32_t>(DRM_IOCTL_SYNCOBJ_CREATE);
 	link.Attach<uint32_t>(flags);
 	status_t reply;
 	link.FlushWithReply(reply);
@@ -180,11 +181,11 @@ int RadeonGfxAccelerant::DrmSyncobjCreate(uint32_t flags, uint32_t *handle)
 
 int RadeonGfxAccelerant::DrmSyncobjDestroy(uint32_t handle)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_IOCTL_SYNCOBJ_DESTROY);
+	link.Attach<uint32_t>(DRM_IOCTL_SYNCOBJ_DESTROY);
 	drm_syncobj_destroy args {.handle = handle};
 	link.Attach(&args, sizeof(args));
 	status_t reply;
@@ -195,11 +196,11 @@ int RadeonGfxAccelerant::DrmSyncobjDestroy(uint32_t handle)
 
 int RadeonGfxAccelerant::DrmSyncobjHandleToFD(uint32_t handle, int *obj_fd)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_IOCTL_SYNCOBJ_HANDLE_TO_FD);
+	link.Attach<uint32_t>(DRM_IOCTL_SYNCOBJ_HANDLE_TO_FD);
 	link.Attach<uint32_t>(handle);
 	status_t reply;
 	link.FlushWithReply(reply);
@@ -210,11 +211,11 @@ int RadeonGfxAccelerant::DrmSyncobjHandleToFD(uint32_t handle, int *obj_fd)
 
 int RadeonGfxAccelerant::DrmSyncobjFDToHandle(int obj_fd, uint32_t *handle)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_IOCTL_SYNCOBJ_FD_TO_HANDLE);
+	link.Attach<uint32_t>(DRM_IOCTL_SYNCOBJ_FD_TO_HANDLE);
 	link.Attach<int>(obj_fd);
 	status_t reply;
 	link.FlushWithReply(reply);
@@ -241,11 +242,11 @@ int RadeonGfxAccelerant::DrmSyncobjExportSyncFile(uint32_t handle, int *sync_fil
 
 int RadeonGfxAccelerant::DrmSyncobjWait(uint32_t *handles, unsigned num_handles, int64_t timeout_nsec, unsigned flags, uint32_t *first_signaled)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_IOCTL_SYNCOBJ_WAIT);
+	link.Attach<uint32_t>(DRM_IOCTL_SYNCOBJ_WAIT);
 	link.Attach<uint64_t>(0);
 	link.Attach<uint64_t>(timeout_nsec);
 	link.Attach<uint32_t>(num_handles);
@@ -260,11 +261,11 @@ int RadeonGfxAccelerant::DrmSyncobjWait(uint32_t *handles, unsigned num_handles,
 
 int RadeonGfxAccelerant::DrmSyncobjReset(const uint32_t *handles, uint32_t handle_count)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_IOCTL_SYNCOBJ_RESET);
+	link.Attach<uint32_t>(DRM_IOCTL_SYNCOBJ_RESET);
 	link.Attach<uint32_t>(handle_count);
 	link.Attach(handles, sizeof(uint32_t)*handle_count);
 	status_t reply;
@@ -292,11 +293,11 @@ int RadeonGfxAccelerant::DrmSyncobjTimelineSignal(const uint32_t *handles, uint6
 
 int RadeonGfxAccelerant::DrmSyncobjTimelineWait(uint32_t *handles, uint64_t *points, unsigned num_handles, int64_t timeout_nsec, unsigned flags, uint32_t *first_signaled)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_IOCTL_SYNCOBJ_TIMELINE_WAIT);
+	link.Attach<uint32_t>(DRM_IOCTL_SYNCOBJ_TIMELINE_WAIT);
 	link.Attach<uint64_t>(0); // handles
 	link.Attach<uint64_t>(0); // points
 	link.Attach<uint64_t>(timeout_nsec);
@@ -323,11 +324,11 @@ int RadeonGfxAccelerant::DrmSyncobjQuery(uint32_t *handles, uint64_t *points, ui
 
 int RadeonGfxAccelerant::DrmSyncobjTransfer(uint32_t dst_handle, uint64_t dst_point, uint32_t src_handle, uint64_t src_point, uint32_t flags)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_IOCTL_SYNCOBJ_TRANSFER);
+	link.Attach<uint32_t>(DRM_IOCTL_SYNCOBJ_TRANSFER);
 	link.Attach<uint32_t>(src_handle);
 	link.Attach<uint32_t>(dst_handle);
 	link.Attach<uint64_t>(src_point);
@@ -342,11 +343,11 @@ int RadeonGfxAccelerant::DrmSyncobjTransfer(uint32_t dst_handle, uint64_t dst_po
 
 int RadeonGfxAccelerant::DrmSyncobjAccumulate(uint32_t syncobj1, uint32_t syncobj2, uint64_t point)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_IOCTL_SYNCOBJ_ACCUMULATE);
+	link.Attach<uint32_t>(DRM_IOCTL_SYNCOBJ_ACCUMULATE);
 	link.Attach<uint32_t>(syncobj1);
 	link.Attach<uint32_t>(syncobj2);
 	link.Attach<uint64_t>(point);
@@ -361,14 +362,15 @@ int RadeonGfxAccelerant::DrmSyncobjAccumulate(uint32_t syncobj1, uint32_t syncob
 
 int RadeonGfxAccelerant::AmdgpuQueryInfo(struct drm_amdgpu_info *info)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_COMMAND_BASE + DRM_AMDGPU_INFO);
+	link.Attach<uint32_t>(DRM_COMMAND_BASE + DRM_AMDGPU_INFO);
+	link.Attach(info->return_size);
+	link.Attach(info->query);
 	switch (info->query) {
 		case AMDGPU_INFO_ACCEL_WORKING:
-		case AMDGPU_INFO_HW_IP_INFO:
 		case AMDGPU_INFO_VRAM_USAGE:
 		case AMDGPU_INFO_GTT_USAGE:
 		case AMDGPU_INFO_GDS_CONFIG:
@@ -376,44 +378,40 @@ int RadeonGfxAccelerant::AmdgpuQueryInfo(struct drm_amdgpu_info *info)
 		case AMDGPU_INFO_DEV_INFO:
 		case AMDGPU_INFO_VIS_VRAM_USAGE:
 		case AMDGPU_INFO_MEMORY:
-			link.Attach(info->return_size);
-			link.Attach(info->query);
-			// no input arguments
-			break;
-		case AMDGPU_INFO_FW_VERSION: {
-			link.Attach(info->return_size);
-			link.Attach(info->query);
-			link.Attach(&info->query_fw, sizeof(info->query_fw));
-			break;
-		}
-		case AMDGPU_INFO_READ_MMR_REG: {
-			link.Attach(info->return_size);
-			link.Attach(info->query);
-			link.Attach(&info->read_mmr_reg, sizeof(info->read_mmr_reg));
-			break;
-		}
-		case AMDGPU_INFO_VIDEO_CAPS: {
-			link.Attach(info->return_size);
-			link.Attach(info->query);
-			link.Attach(&info->video_cap, sizeof(info->video_cap));
-			break;
-		}
-/*
-		case AMDGPU_INFO_CRTC_FROM_ID:
-		case AMDGPU_INFO_HW_IP_COUNT:
 		case AMDGPU_INFO_TIMESTAMP:
 		case AMDGPU_INFO_NUM_BYTES_MOVED:
 		case AMDGPU_INFO_NUM_EVICTIONS:
 		case AMDGPU_INFO_VCE_CLOCK_TABLE:
-		case AMDGPU_INFO_VBIOS:
-		case AMDGPU_INFO_SENSOR:
 		case AMDGPU_INFO_NUM_VRAM_CPU_PAGE_FAULTS:
 		case AMDGPU_INFO_VRAM_LOST_COUNTER:
 		case AMDGPU_INFO_RAS_ENABLED_FEATURES:
+			// no input arguments
 			break;
-*/
+		case AMDGPU_INFO_CRTC_FROM_ID:
+			link.Attach(&info->mode_crtc, sizeof(info->mode_crtc));
+			break;
+		case AMDGPU_INFO_HW_IP_INFO:
+		case AMDGPU_INFO_HW_IP_COUNT:
+			link.Attach(&info->query_hw_ip, sizeof(info->query_hw_ip));
+			break;
+		case AMDGPU_INFO_READ_MMR_REG:
+			link.Attach(&info->read_mmr_reg, sizeof(info->read_mmr_reg));
+			break;
+		case AMDGPU_INFO_FW_VERSION:
+			link.Attach(&info->query_fw, sizeof(info->query_fw));
+			break;
+		case AMDGPU_INFO_VBIOS:
+			link.Attach(&info->vbios_info, sizeof(info->sensor_info));
+			break;
+		case AMDGPU_INFO_SENSOR:
+			link.Attach(&info->sensor_info, sizeof(info->sensor_info));
+			break;
+		case AMDGPU_INFO_VIDEO_CAPS:
+			link.Attach(&info->video_cap, sizeof(info->video_cap));
+			break;
 		default:
 			fprintf(stderr, "RadeonGfxAccelerant::AmdgpuQueryInfo: unknown info->query: %" PRIu32 "\n", info->query);
+			link.CancelMessage();
 			CheckRet(ENOSYS);
 	}
 	status_t reply;
@@ -427,11 +425,11 @@ int RadeonGfxAccelerant::AmdgpuQueryInfo(struct drm_amdgpu_info *info)
 
 int RadeonGfxAccelerant::AmdgpuBoAlloc(struct amdgpu_bo_alloc_request *alloc_buffer, uint32_t *buf_handle)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_CREATE);
+	link.Attach<uint32_t>(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_CREATE);
 	link.Attach<uint64_t>(alloc_buffer->alloc_size);
 	link.Attach<uint64_t>(alloc_buffer->phys_alignment);
 	link.Attach<uint64_t>(alloc_buffer->preferred_heap);
@@ -447,7 +445,7 @@ int RadeonGfxAccelerant::AmdgpuBoAlloc(struct amdgpu_bo_alloc_request *alloc_buf
 
 int RadeonGfxAccelerant::AmdgpuCreateBoFromUserMem(void *cpu, uint64_t size, uint32_t *buf_handle)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 
 	area_id area = area_for(cpu);
@@ -457,7 +455,7 @@ int RadeonGfxAccelerant::AmdgpuCreateBoFromUserMem(void *cpu, uint64_t size, uin
 
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_USERPTR);
+	link.Attach<uint32_t>(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_USERPTR);
 
 	link.Attach<uint64_t>((addr_t)cpu - (addr_t)info.address);
 	link.Attach<uint64_t>(size);
@@ -472,7 +470,7 @@ int RadeonGfxAccelerant::AmdgpuCreateBoFromUserMem(void *cpu, uint64_t size, uin
 
 int RadeonGfxAccelerant::AmdgpuBoQueryInfo(uint32_t bo, struct amdgpu_bo_info *info)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	struct drm_amdgpu_gem_metadata metadata {};
 	struct drm_amdgpu_gem_create_in bo_info {};
@@ -480,7 +478,7 @@ int RadeonGfxAccelerant::AmdgpuBoQueryInfo(uint32_t bo, struct amdgpu_bo_info *i
 
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_METADATA);
+	link.Attach<uint32_t>(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_METADATA);
 	link.Attach<uint32_t>(bo);
 	link.Attach<uint32_t>(AMDGPU_GEM_METADATA_OP_GET_METADATA);
 	link.FlushWithReply(reply);
@@ -489,7 +487,7 @@ int RadeonGfxAccelerant::AmdgpuBoQueryInfo(uint32_t bo, struct amdgpu_bo_info *i
 
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_OP);
+	link.Attach<uint32_t>(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_OP);
 	link.Attach<uint32_t>(bo);
 	link.Attach<uint32_t>(AMDGPU_GEM_OP_GET_GEM_CREATE_INFO);
 	link.FlushWithReply(reply);
@@ -512,7 +510,7 @@ int RadeonGfxAccelerant::AmdgpuBoQueryInfo(uint32_t bo, struct amdgpu_bo_info *i
 
 int RadeonGfxAccelerant::AmdgpuBoSetMetadata(uint32_t bo, struct amdgpu_bo_metadata *info)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	struct drm_amdgpu_gem_metadata args {};
 
@@ -529,7 +527,7 @@ int RadeonGfxAccelerant::AmdgpuBoSetMetadata(uint32_t bo, struct amdgpu_bo_metad
 
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_METADATA);
+	link.Attach<uint32_t>(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_METADATA);
 	link.Attach(&args, sizeof(args));
 	status_t reply;
 	link.FlushWithReply(reply);
@@ -539,11 +537,11 @@ int RadeonGfxAccelerant::AmdgpuBoSetMetadata(uint32_t bo, struct amdgpu_bo_metad
 
 int RadeonGfxAccelerant::AmdgpuBoVaOpRaw(uint32_t bo, uint64_t offset, uint64_t size, uint64_t addr, uint64_t flags, uint32_t ops)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_VA);
+	link.Attach<uint32_t>(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_VA);
 	link.Attach<uint32_t>(bo);
 	link.Attach<uint32_t>(0); // pad
 	link.Attach<uint32_t>(ops);
@@ -567,11 +565,11 @@ int RadeonGfxAccelerant::AmdgpuBoCpuMap(uint32_t bo, void **cpu)
 
 int RadeonGfxAccelerant::AmdgpuCsSubmitRaw(uint32_t context_id, uint32_t bo_list_handle, int num_chunks, struct drm_amdgpu_cs_chunk *chunks, uint64_t *seq_no)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_COMMAND_BASE + DRM_AMDGPU_CS);
+	link.Attach<uint32_t>(DRM_COMMAND_BASE + DRM_AMDGPU_CS);
 	link.Attach<uint32_t>(context_id);
 	link.Attach<uint32_t>(bo_list_handle);
 	link.Attach<uint32_t>(num_chunks);
@@ -612,11 +610,11 @@ int RadeonGfxAccelerant::AmdgpuCsSubmitRaw(uint32_t context_id, uint32_t bo_list
 
 int RadeonGfxAccelerant::AmdgpuWaitCs(uint32_t ctx_id, unsigned ip, unsigned ip_instance, uint32_t ring, uint64_t handle, uint64_t timeout_ns, bool *busy)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
-	link.Attach<unsigned long>(DRM_COMMAND_BASE + DRM_AMDGPU_WAIT_CS);
+	link.Attach<uint32_t>(DRM_COMMAND_BASE + DRM_AMDGPU_WAIT_CS);
 	link.Attach<uint64_t>(handle);
 	link.Attach<uint64_t>(timeout_ns);
 	link.Attach<uint32_t>(ip);
@@ -660,7 +658,7 @@ int RadeonGfxAccelerant::AmdgpuCtxRaw(union drm_amdgpu_ctx *args)
 
 status_t RadeonGfxAccelerant::DisplayGetConsumer(int32 crtc, BMessenger &consumer)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	link.StartMessage(radeonGetDisplayConsumer);
 	link.Attach(crtc);
@@ -673,7 +671,7 @@ status_t RadeonGfxAccelerant::DisplayGetConsumer(int32 crtc, BMessenger &consume
 
 status_t RadeonGfxAccelerant::DisplayUpdateCursor(int32 crtc, const CursorUpdateInfo &info)
 {
-	ClientThreadLink *threadLink = GetClientThreadLink(fServerMsgr);
+	ClientThreadLink *threadLink = fConn.GetLink();
 	auto &link = threadLink->Link();
 	link.StartMessage(radeonUpdateCursor);
 	link.Attach(crtc);

@@ -89,7 +89,7 @@ extern "C" _EXPORT int drmMunmap(void *addr, size_t length)
 	return gTeamState.Switch()->CpuUnmap(addr, -1, 0, length, 0);
 }
 
-int drmIoctlInt(ExternalPtr<TeamState> teamState, unsigned long request, void *arg)
+int drmIoctlInt(ExternalPtr<TeamState> teamState, uint32_t request, void *arg)
 {
 	unsigned long requestCmd = request%0x100;
 	if (requestCmd >= DRM_COMMAND_BASE && requestCmd < DRM_COMMAND_END) {
@@ -660,5 +660,6 @@ int drmIoctlInt(ExternalPtr<TeamState> teamState, unsigned long request, void *a
 
 extern "C" _EXPORT int drmIoctl(int fd, unsigned long request, void *arg)
 {
+	(void)fd;
 	return drmIoctlInt(gTeamState, request, arg);
 }

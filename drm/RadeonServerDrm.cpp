@@ -32,17 +32,12 @@ void RadeonHandleDrmMessage(BPrivate::PortLink &link, ExternalRef<TeamState> sta
 			link.Flush();
 			return;
 		}
-		case radeonMunmapMsg: {
-			link.StartMessage(B_OK);
-			link.Flush();
-			return;
-		}
 		case radeonIoctlMsg: {
 			int fd;
-			unsigned long request;
+			uint32_t request;
 			link.Read(&fd);
 			link.Read(&request);
-			unsigned long requestCmd = request%0x100;
+			uint32_t requestCmd = request%0x100;
 			if (requestCmd >= DRM_COMMAND_BASE && requestCmd < DRM_COMMAND_END) {
 				requestCmd -= DRM_COMMAND_BASE;
 				switch (requestCmd) {
@@ -54,7 +49,6 @@ void RadeonHandleDrmMessage(BPrivate::PortLink &link, ExternalRef<TeamState> sta
 						args.return_pointer = (addr_t)returnData.Get();
 						switch (args.query) {
 							case AMDGPU_INFO_ACCEL_WORKING:
-							case AMDGPU_INFO_HW_IP_INFO:
 							case AMDGPU_INFO_VRAM_USAGE:
 							case AMDGPU_INFO_GTT_USAGE:
 							case AMDGPU_INFO_GDS_CONFIG:
@@ -62,34 +56,37 @@ void RadeonHandleDrmMessage(BPrivate::PortLink &link, ExternalRef<TeamState> sta
 							case AMDGPU_INFO_DEV_INFO:
 							case AMDGPU_INFO_VIS_VRAM_USAGE:
 							case AMDGPU_INFO_MEMORY:
-								// no input arguments
-								break;
-							case AMDGPU_INFO_FW_VERSION: {
-								link.Read(&args.query_fw, sizeof(args.query_fw));
-								break;
-							}
-							case AMDGPU_INFO_READ_MMR_REG: {
-								link.Read(&args.read_mmr_reg, sizeof(args.read_mmr_reg));
-								break;
-							}
-							case AMDGPU_INFO_VIDEO_CAPS: {
-								link.Read(&args.video_cap, sizeof(args.video_cap));
-								break;
-							}
-		/*
-							case AMDGPU_INFO_CRTC_FROM_ID:
-							case AMDGPU_INFO_HW_IP_COUNT:
 							case AMDGPU_INFO_TIMESTAMP:
 							case AMDGPU_INFO_NUM_BYTES_MOVED:
 							case AMDGPU_INFO_NUM_EVICTIONS:
 							case AMDGPU_INFO_VCE_CLOCK_TABLE:
-							case AMDGPU_INFO_VBIOS:
-							case AMDGPU_INFO_SENSOR:
 							case AMDGPU_INFO_NUM_VRAM_CPU_PAGE_FAULTS:
 							case AMDGPU_INFO_VRAM_LOST_COUNTER:
 							case AMDGPU_INFO_RAS_ENABLED_FEATURES:
+								// no input arguments
 								break;
-		*/
+							case AMDGPU_INFO_CRTC_FROM_ID:
+								link.Read(&args.mode_crtc, sizeof(args.mode_crtc));
+								break;
+							case AMDGPU_INFO_HW_IP_INFO:
+							case AMDGPU_INFO_HW_IP_COUNT:
+								link.Read(&args.query_hw_ip, sizeof(args.query_hw_ip));
+								break;
+							case AMDGPU_INFO_READ_MMR_REG:
+								link.Read(&args.read_mmr_reg, sizeof(args.read_mmr_reg));
+								break;
+							case AMDGPU_INFO_FW_VERSION:
+								link.Read(&args.query_fw, sizeof(args.query_fw));
+								break;
+							case AMDGPU_INFO_VBIOS:
+								link.Read(&args.vbios_info, sizeof(args.sensor_info));
+								break;
+							case AMDGPU_INFO_SENSOR:
+								link.Read(&args.sensor_info, sizeof(args.sensor_info));
+								break;
+							case AMDGPU_INFO_VIDEO_CAPS:
+								link.Read(&args.video_cap, sizeof(args.video_cap));
+								break;
 							default:
 								CheckLink(ENOSYS);
 						}
