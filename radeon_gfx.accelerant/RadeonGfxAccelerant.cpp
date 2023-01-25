@@ -143,7 +143,7 @@ int RadeonGfxAccelerant::DrmPrimeHandleToFD(uint32_t handle, uint32_t flags, int
 	link.Attach<uint32_t>(handle);
 	status_t reply;
 	link.FlushWithReply(reply);
-	link.Read(prime_fd, sizeof(*prime_fd));
+	link.Read(prime_fd);
 	CheckRet(reply);
 	return B_OK;
 }
@@ -158,7 +158,7 @@ int RadeonGfxAccelerant::DrmPrimeFDToHandle(int prime_fd, uint32_t *handle)
 	link.Attach<int>(prime_fd);
 	status_t reply;
 	link.FlushWithReply(reply);
-	link.Read(handle, sizeof(*handle));
+	link.Read(handle);
 	CheckRet(reply);
 	return B_OK;
 }
@@ -174,7 +174,7 @@ int RadeonGfxAccelerant::DrmSyncobjCreate(uint32_t flags, uint32_t *handle)
 	link.Attach<uint32_t>(flags);
 	status_t reply;
 	link.FlushWithReply(reply);
-	link.Read(handle, sizeof(*handle));
+	link.Read(handle);
 	CheckRet(reply);
 	return B_OK;
 }
@@ -187,7 +187,7 @@ int RadeonGfxAccelerant::DrmSyncobjDestroy(uint32_t handle)
 	link.Attach<int>(fFd.Get());
 	link.Attach<uint32_t>(DRM_IOCTL_SYNCOBJ_DESTROY);
 	drm_syncobj_destroy args {.handle = handle};
-	link.Attach(&args, sizeof(args));
+	link.Attach(args);
 	status_t reply;
 	link.FlushWithReply(reply);
 	CheckRet(reply);
@@ -204,7 +204,7 @@ int RadeonGfxAccelerant::DrmSyncobjHandleToFD(uint32_t handle, int *obj_fd)
 	link.Attach<uint32_t>(handle);
 	status_t reply;
 	link.FlushWithReply(reply);
-	link.Read(obj_fd, sizeof(*obj_fd));
+	link.Read(obj_fd);
 	CheckRet(reply);
 	return B_OK;
 }
@@ -219,7 +219,7 @@ int RadeonGfxAccelerant::DrmSyncobjFDToHandle(int obj_fd, uint32_t *handle)
 	link.Attach<int>(obj_fd);
 	status_t reply;
 	link.FlushWithReply(reply);
-	link.Read(handle, sizeof(*handle));
+	link.Read(handle);
 	CheckRet(reply);
 	return B_OK;
 }
@@ -254,7 +254,7 @@ int RadeonGfxAccelerant::DrmSyncobjWait(uint32_t *handles, unsigned num_handles,
 	link.Attach(handles, sizeof(uint32_t)*num_handles);
 	status_t reply;
 	link.FlushWithReply(reply);
-	link.Read(first_signaled, sizeof(*first_signaled));
+	link.Read(first_signaled);
 	CheckRet(reply);
 	return B_OK;
 }
@@ -307,7 +307,7 @@ int RadeonGfxAccelerant::DrmSyncobjTimelineWait(uint32_t *handles, uint64_t *poi
 	link.Attach(points, sizeof(uint64_t)*num_handles);
 	status_t reply;
 	link.FlushWithReply(reply);
-	link.Read(first_signaled, sizeof(*first_signaled));
+	link.Read(first_signaled);
 	CheckRet(reply);
 	return B_OK;
 }
@@ -388,26 +388,26 @@ int RadeonGfxAccelerant::AmdgpuQueryInfo(struct drm_amdgpu_info *info)
 			// no input arguments
 			break;
 		case AMDGPU_INFO_CRTC_FROM_ID:
-			link.Attach(&info->mode_crtc, sizeof(info->mode_crtc));
+			link.Attach(info->mode_crtc);
 			break;
 		case AMDGPU_INFO_HW_IP_INFO:
 		case AMDGPU_INFO_HW_IP_COUNT:
-			link.Attach(&info->query_hw_ip, sizeof(info->query_hw_ip));
+			link.Attach(info->query_hw_ip);
 			break;
 		case AMDGPU_INFO_READ_MMR_REG:
-			link.Attach(&info->read_mmr_reg, sizeof(info->read_mmr_reg));
+			link.Attach(info->read_mmr_reg);
 			break;
 		case AMDGPU_INFO_FW_VERSION:
-			link.Attach(&info->query_fw, sizeof(info->query_fw));
+			link.Attach(info->query_fw);
 			break;
 		case AMDGPU_INFO_VBIOS:
-			link.Attach(&info->vbios_info, sizeof(info->sensor_info));
+			link.Attach(info->vbios_info);
 			break;
 		case AMDGPU_INFO_SENSOR:
-			link.Attach(&info->sensor_info, sizeof(info->sensor_info));
+			link.Attach(info->sensor_info);
 			break;
 		case AMDGPU_INFO_VIDEO_CAPS:
-			link.Attach(&info->video_cap, sizeof(info->video_cap));
+			link.Attach(info->video_cap);
 			break;
 		default:
 			fprintf(stderr, "RadeonGfxAccelerant::AmdgpuQueryInfo: unknown info->query: %" PRIu32 "\n", info->query);
@@ -417,7 +417,7 @@ int RadeonGfxAccelerant::AmdgpuQueryInfo(struct drm_amdgpu_info *info)
 	status_t reply;
 	link.FlushWithReply(reply);
 	uint32 replySize;
-	link.Read<uint32>(&replySize);
+	link.Read(&replySize);
 	link.Read((void*)(addr_t)info->return_pointer, replySize);
 	CheckRet(reply);
 	return B_OK;
@@ -436,9 +436,9 @@ int RadeonGfxAccelerant::AmdgpuBoAlloc(struct amdgpu_bo_alloc_request *alloc_buf
 	link.Attach<uint64_t>(alloc_buffer->flags);
 	status_t reply;
 	link.FlushWithReply(reply);
-	link.Read(buf_handle, sizeof(buf_handle));
+	link.Read(buf_handle);
 	uint32_t pad;
-	link.Read(&pad, sizeof(pad));
+	link.Read(&pad);
 	CheckRet(reply);
 	return B_OK;
 }
@@ -463,7 +463,7 @@ int RadeonGfxAccelerant::AmdgpuCreateBoFromUserMem(void *cpu, uint64_t size, uin
 	link.Attach<uint32_t>(area);
 	status_t reply;
 	link.FlushWithReply(reply);
-	link.Read(buf_handle, sizeof(*buf_handle));
+	link.Read(buf_handle);
 	CheckRet(reply);
 	return B_OK;
 }
@@ -482,7 +482,7 @@ int RadeonGfxAccelerant::AmdgpuBoQueryInfo(uint32_t bo, struct amdgpu_bo_info *i
 	link.Attach<uint32_t>(bo);
 	link.Attach<uint32_t>(AMDGPU_GEM_METADATA_OP_GET_METADATA);
 	link.FlushWithReply(reply);
-	link.Read(&metadata.data, sizeof(metadata.data));
+	link.Read(&metadata.data);
 	CheckRet(reply);
 
 	link.StartMessage(radeonIoctlMsg);
@@ -491,7 +491,7 @@ int RadeonGfxAccelerant::AmdgpuBoQueryInfo(uint32_t bo, struct amdgpu_bo_info *i
 	link.Attach<uint32_t>(bo);
 	link.Attach<uint32_t>(AMDGPU_GEM_OP_GET_GEM_CREATE_INFO);
 	link.FlushWithReply(reply);
-	link.Read(&bo_info, sizeof(bo_info));
+	link.Read(&bo_info);
 
 	memset(info, 0, sizeof(*info));
 	info->alloc_size = bo_info.bo_size;
@@ -528,7 +528,7 @@ int RadeonGfxAccelerant::AmdgpuBoSetMetadata(uint32_t bo, struct amdgpu_bo_metad
 	link.StartMessage(radeonIoctlMsg);
 	link.Attach<int>(fFd.Get());
 	link.Attach<uint32_t>(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_METADATA);
-	link.Attach(&args, sizeof(args));
+	link.Attach(args);
 	status_t reply;
 	link.FlushWithReply(reply);
 	CheckRet(reply);
@@ -576,34 +576,32 @@ int RadeonGfxAccelerant::AmdgpuCsSubmitRaw(uint32_t context_id, uint32_t bo_list
 	link.Attach<uint32_t>(0); // flags
 	link.Attach<uint64_t>(0); // chunks
 	for (int i = 0; i < num_chunks; i++) {
-		struct drm_amdgpu_cs_chunk *chunk = &chunks[i];
-		link.Attach(chunk, sizeof(struct drm_amdgpu_cs_chunk));
+		link.Attach(chunks[i]);
 	}
 	for (int i = 0; i < num_chunks; i++) {
-		struct drm_amdgpu_cs_chunk *chunk = &chunks[i];
-		switch(chunk->chunk_id) {
+		auto &chunk = chunks[i];
+		switch(chunk.chunk_id) {
 			case AMDGPU_CHUNK_ID_IB:
 			case AMDGPU_CHUNK_ID_FENCE:
 			case AMDGPU_CHUNK_ID_DEPENDENCIES:
 			case AMDGPU_CHUNK_ID_SYNCOBJ_IN:
 			case AMDGPU_CHUNK_ID_SYNCOBJ_OUT:
 			case AMDGPU_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT:
-			case AMDGPU_CHUNK_ID_SYNCOBJ_TIMELINE_SIGNAL:
-			{
-				link.Attach((void*)chunk->chunk_data, 4*chunk->length_dw);
+			case AMDGPU_CHUNK_ID_SYNCOBJ_TIMELINE_SIGNAL: {
+				link.Attach((void*)chunk.chunk_data, 4*chunk.length_dw);
 				break;
 			}
 			case AMDGPU_CHUNK_ID_BO_HANDLES: {
-				auto chunk_data_handles = (drm_amdgpu_bo_list_in*)chunk->chunk_data;
-				link.Attach(chunk_data_handles, sizeof(struct drm_amdgpu_bo_list_in));
-				link.Attach((void*)chunk_data_handles->bo_info_ptr, chunk_data_handles->bo_info_size*chunk_data_handles->bo_number);
+				auto &chunk_data_handles = *(drm_amdgpu_bo_list_in*)chunk.chunk_data;
+				link.Attach(chunk_data_handles);
+				link.Attach((void*)chunk_data_handles.bo_info_ptr, chunk_data_handles.bo_info_size*chunk_data_handles.bo_number);
 				break;
 			}
 		}
 	}
 	status_t reply;
 	link.FlushWithReply(reply);
-	link.Read(seq_no, sizeof(seq_no));
+	link.Read(seq_no);
 	CheckRet(reply);
 	return B_OK;
 }
@@ -624,7 +622,7 @@ int RadeonGfxAccelerant::AmdgpuWaitCs(uint32_t ctx_id, unsigned ip, unsigned ip_
 	status_t reply;
 	link.FlushWithReply(reply);
 	uint64_t status;
-	link.Read(&status, sizeof(status));
+	link.Read(&status);
 	*busy = status != 0;
 	CheckRet(reply);
 	return B_OK;

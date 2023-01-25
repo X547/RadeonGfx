@@ -12,7 +12,6 @@
 class RadeonGfxAccelerant: public Accelerant, public AccelerantDrm, public AccelerantAmdgpu, public AccelerantDisplay {
 private:
 	FileDescriptorCloser fFd;
-	BMessenger fServerMsgr;
 	ClientThreadLinkConnection fConn;
 
 public:
