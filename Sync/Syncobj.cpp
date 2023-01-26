@@ -34,7 +34,18 @@ void Syncobj::FenceHandler::Do(Fence *fence)
 	//TRACE("Syncobj::Handler::Do(%p)\n", fence);
 	auto &item = ContainerOf(*this, &FenceItem::handler);
 	Syncobj *syncobj = item.base;
+	AutoLocker<RecursiveLock, AutoLockerLocksLocking<RecursiveLock>> lock(&syncobj->fLock);
 	syncobj->fLastSignaled = &item;
+
+	for (Syncobj::FenceItem* it = syncobj->fFences.First(); it != NULL; ) {
+		Syncobj::FenceItem *next = syncobj->fFences.GetNext(it);
+		if (it->point < item.point) {
+			syncobj->fFences.Remove(it);
+			delete it;
+		}
+		it = next;
+	}
+
 }
 
 
